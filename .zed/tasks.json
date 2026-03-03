@@ -1,0 +1,7 @@
+[
+  {
+    "label": "run Evolution Renderer",
+    "command": "xmake",
+    "args": ["run", "EvolutionRenderer"],
+  },
+]
