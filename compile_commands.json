@@ -1,6 +1,0 @@
-[
-{
-  "directory": "C:\\Users\\eekqd\\Desktop\\EvolutionRenderer",
-  "arguments": ["C:\\Program Files\\LLVM\\bin\\clang++.exe", "-c", "-Qunused-arguments", "--target=x86_64-pc-windows-msvc", "-Xclang", "--dependent-lib=windows\\clang_rt.builtins-x86_64.lib", "-fms-runtime-lib=dll", "-fvisibility=hidden", "-fvisibility-inlines-hidden", "-O3", "-std=c++20", "-fexceptions", "-fcxx-exceptions", "-DNDEBUG", "-o", "build\\.objs\\EvolutionRenderer\\windows\\x64\\release\\src\\main.cpp.obj", "src\\main.cpp"],
-  "file": "src\\main.cpp"
-}]
