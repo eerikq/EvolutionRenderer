@@ -2,6 +2,24 @@
   {
     "label": "run Evolution Renderer",
     "command": "xmake",
-    "args": ["run", "EvolutionRenderer"],
+    "args": ["run", "evolution-renderer"],
+  },
+  {
+    "label": "build Evolution Renderer",
+    "command": "xmake",
+    "args": ["build", "evolution-renderer"],
+  },
+  {
+    "label": "compile shaders",
+    "command": "slangc",
+    "args": [
+      "shaders/shader.slang",
+      "-target", "spirv",
+      "-profile", "spirv_1_4",
+      "-emit-spirv-directly",
+      "-fvk-use-entrypoint-name",
+      "-entry", "vertMain",
+      "-entry", "fragMain",
+      "-o", "shaders/slang.spv"]
   },
 ]
