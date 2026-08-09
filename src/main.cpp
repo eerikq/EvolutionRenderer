@@ -1,4 +1,3 @@
-#include "vulkan/vulkan.hpp"
 #include <stdexcept>
 #include <vector>
 #include <iostream>
@@ -52,8 +51,16 @@ class Triangle {
     	vk::Extent2D swapChainExtent;
         std::vector<vk::raii::ImageView> swap_chain_image_views;
 
-        vk::raii::PipelineLayout pipelineLayout = nullptr;
+        vk::raii::PipelineLayout pipeline_layout = nullptr;
         vk::raii::Pipeline graphics_pipeline = nullptr;
+        vk::raii::CommandPool command_pool = nullptr;
+        vk::raii::CommandBuffer command_buffer = nullptr;
+
+        vk::raii::Semaphore present_complete_semaphore = nullptr;
+        vk::raii::Semaphore render_finished_semaphore = nullptr;
+        vk::raii::Fence draw_fence = nullptr;
+
+        uint32_t queueIndex = ~0;
 
         const std::vector<char const*> validation_layers = {
             "VK_LAYER_KHRONOS_validation"
@@ -219,7 +226,7 @@ class Triangle {
             std::vector<vk::QueueFamilyProperties> queueFamilyProperties = physical_device.getQueueFamilyProperties();
 
             // get the first index into queueFamilyProperties which supports both graphics and present
-            uint32_t queueIndex = ~0;
+
             for (uint32_t qfpIndex = 0; qfpIndex < queueFamilyProperties.size(); qfpIndex++) {
                 if ((queueFamilyProperties[qfpIndex].queueFlags & vk::QueueFlagBits::eGraphics) && physical_device.getSurfaceSupportKHR(qfpIndex, *surface)) {
                     // found a queue family that supports both graphics and present
@@ -448,7 +455,7 @@ class Triangle {
                 .pushConstantRangeCount = 0
             };
 
-            pipelineLayout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
+            pipeline_layout = vk::raii::PipelineLayout(device, pipelineLayoutInfo);
 
             vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
                 .colorAttachmentCount = 1,
@@ -465,7 +472,7 @@ class Triangle {
                     .pMultisampleState = &multisampling,
                     .pColorBlendState = &colorBlending,
                     .pDynamicState = &dynamicState,
-                    .layout = pipelineLayout,
+                    .layout = pipeline_layout,
                     .renderPass = nullptr
                 },
                 {
@@ -477,23 +484,120 @@ class Triangle {
             graphics_pipeline = vk::raii::Pipeline(device, nullptr, pipelineCreateInfoChain.get<vk::GraphicsPipelineCreateInfo>());
         }
 
-        void draw_dummy_frame() {
-            // 1. Create a semaphore for acquiring the image
-            vk::raii::Semaphore image_available_semaphore(device, vk::SemaphoreCreateInfo{});
-
-            // 2. Acquire a swapchain image index
-            auto [result, image_index] = swap_chain.acquireNextImage(UINT64_MAX, *image_available_semaphore);
-
-            // 3. Immediately present it (no rendering, no command buffers!)
-            vk::PresentInfoKHR present_info {
-                .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*image_available_semaphore,
-                .swapchainCount = 1,
-                .pSwapchains = &*swap_chain,
-                .pImageIndices = &image_index
+        void create_command_pool() {
+            vk::CommandPoolCreateInfo poolInfo {
+                .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
+                .queueFamilyIndex = queueIndex
             };
 
-            (void)graphics_queue.presentKHR(present_info);
+            command_pool = vk::raii::CommandPool(device, poolInfo);
+        }
+
+        void create_command_buffer() {
+            vk::CommandBufferAllocateInfo allocInfo {
+                .commandPool = command_pool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1
+            };
+
+            command_buffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+        }
+
+        void record_command_buffer(uint32_t imageIndex) {
+            command_buffer.begin({});
+
+            // Before starting rendering, transition the swapchain image to vk::ImageLayout::eColorAttachmentOptimal
+            transition_image_layout(
+                imageIndex,
+                vk::ImageLayout::eUndefined,
+                vk::ImageLayout::eColorAttachmentOptimal,
+                {},
+                vk::AccessFlagBits2::eColorAttachmentWrite,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput
+            );
+
+            vk::ClearValue clearColor = vk::ClearColorValue(0.0f, 0.0f, 0.0f, 1.0f);
+            vk::RenderingAttachmentInfo attachmentInfo = {
+                .imageView = swap_chain_image_views[imageIndex],
+                .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+                .loadOp = vk::AttachmentLoadOp::eClear,
+                .storeOp = vk::AttachmentStoreOp::eStore,
+                .clearValue = clearColor
+            };
+
+            vk::RenderingInfo renderingInfo = {
+                .renderArea = {
+                    .offset = {0, 0},
+                    .extent = swapChainExtent
+                },
+                .layerCount = 1,
+                .colorAttachmentCount = 1,
+                .pColorAttachments = &attachmentInfo
+            };
+
+            command_buffer.beginRendering(renderingInfo);
+            command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
+
+            command_buffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
+            command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
+            command_buffer.draw(3, 1, 0, 0);
+
+            command_buffer.endRendering();
+
+            transition_image_layout(
+                imageIndex,
+                vk::ImageLayout::eColorAttachmentOptimal,
+                vk::ImageLayout::ePresentSrcKHR,
+                vk::AccessFlagBits2::eColorAttachmentWrite,
+                {},
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits2::eBottomOfPipe
+            );
+
+            command_buffer.end();
+        }
+
+        void transition_image_layout(
+    	    uint32_t imageIndex,
+    	    vk::ImageLayout old_layout,
+    	    vk::ImageLayout new_layout,
+    	    vk::AccessFlags2 src_access_mask,
+    	    vk::AccessFlags2 dst_access_mask,
+    	    vk::PipelineStageFlags2 src_stage_mask,
+    	    vk::PipelineStageFlags2 dst_stage_mask
+        ){
+    		vk::ImageMemoryBarrier2 barrier = {
+    		    .srcStageMask        = src_stage_mask,
+    		    .srcAccessMask       = src_access_mask,
+    		    .dstStageMask        = dst_stage_mask,
+    		    .dstAccessMask       = dst_access_mask,
+    		    .oldLayout           = old_layout,
+    		    .newLayout           = new_layout,
+    		    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    		    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+    		    .image               = swapChainImages[imageIndex],
+    		    .subresourceRange    = {
+    		           .aspectMask     = vk::ImageAspectFlagBits::eColor,
+    		           .baseMipLevel   = 0,
+    		           .levelCount     = 1,
+    		           .baseArrayLayer = 0,
+    		           .layerCount     = 1
+                }
+            };
+    		vk::DependencyInfo dependency_info = {
+    		    .dependencyFlags         = {},
+    		    .imageMemoryBarrierCount = 1,
+    		    .pImageMemoryBarriers    = &barrier
+            };
+
+            command_buffer.pipelineBarrier2(dependency_info);
+        }
+
+        void create_sync_objects() {
+            present_complete_semaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+            render_finished_semaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
+            draw_fence = vk::raii::Fence(device, { .flags = vk::FenceCreateFlagBits::eSignaled });
         }
 
         void init_vulkan() {
@@ -522,6 +626,60 @@ class Triangle {
 
             create_graphics_pipeline();
             SDL_Log("created graphics pipeline");
+
+            create_command_pool();
+            SDL_Log("created command pool");
+
+            create_command_buffer();
+            SDL_Log("created command buffer");
+
+            create_sync_objects();
+            SDL_Log("created sync objects");
+        }
+
+        void draw_frame() {
+            auto fenceResult = device.waitForFences(*draw_fence, vk::True, UINT64_MAX);
+
+            if (fenceResult != vk::Result::eSuccess) throw std::runtime_error("failed to wait for fence!");
+
+    		device.resetFences(*draw_fence);
+            auto [result, imageIndex] = swap_chain.acquireNextImage(UINT64_MAX, *present_complete_semaphore, nullptr);
+
+            record_command_buffer(imageIndex);
+            graphics_queue.waitIdle();
+
+            vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+            const vk::SubmitInfo   submitInfo{
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &*present_complete_semaphore,
+                .pWaitDstStageMask = &waitDestinationStageMask,
+                .commandBufferCount = 1,
+                .pCommandBuffers = &*command_buffer,
+                .signalSemaphoreCount = 1,
+                .pSignalSemaphores = &*render_finished_semaphore
+            };
+
+           	graphics_queue.submit(submitInfo, *draw_fence);
+
+    		const vk::PresentInfoKHR presentInfoKHR {
+                .waitSemaphoreCount = 1,
+                .pWaitSemaphores = &*render_finished_semaphore,
+                .swapchainCount = 1,
+                .pSwapchains = &*swap_chain,
+                .pImageIndices = &imageIndex
+            };
+
+            result = graphics_queue.presentKHR(presentInfoKHR);
+    		switch (result)
+    		{
+    			case vk::Result::eSuccess:
+    				break;
+    			case vk::Result::eSuboptimalKHR:
+    				std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
+    				break;
+    			default:
+    				break;        // an unexpected result is returned!
+    		}
         }
 
         void main_loop() {
@@ -530,6 +688,7 @@ class Triangle {
 
             while(is_running) {
                 // SDL_Log("running");
+                draw_frame();
 
                 while (SDL_PollEvent(&event)) {
                     // SDL_Log("checking input");
@@ -539,8 +698,9 @@ class Triangle {
                     }
                 }
 
-                draw_dummy_frame();
             }
+
+            device.waitIdle();
         }
 
         void cleanup() {
