@@ -17,6 +17,7 @@
 
 #define SCREEN_WIDTH 1200
 #define SCREEN_HEIGHT 900
+#define MAX_FRAMES_IN_FLIGHT 2
 
 #if NDEBUG
 bool enable_validation_layers = false;
@@ -54,13 +55,17 @@ class Triangle {
         vk::raii::PipelineLayout pipeline_layout = nullptr;
         vk::raii::Pipeline graphics_pipeline = nullptr;
         vk::raii::CommandPool command_pool = nullptr;
-        vk::raii::CommandBuffer command_buffer = nullptr;
+        std::vector<vk::raii::CommandBuffer> command_buffers;
 
-        vk::raii::Semaphore present_complete_semaphore = nullptr;
-        vk::raii::Semaphore render_finished_semaphore = nullptr;
-        vk::raii::Fence draw_fence = nullptr;
+        std::vector<vk::raii::Semaphore> present_complete_semaphores;
+        std::vector<vk::raii::Semaphore> render_finished_semaphores;
+        std::vector<vk::raii::Fence> in_flight_fences;
 
         uint32_t queueIndex = ~0;
+        uint32_t frame_index = 0;
+
+        bool framebuffer_resized = false;
+        bool is_running = true;
 
         const std::vector<char const*> validation_layers = {
             "VK_LAYER_KHRONOS_validation"
@@ -248,7 +253,7 @@ class Triangle {
             vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan11Features, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> featureChain = {
                 {}, // vk::PhysicalDeviceFeatures2 (empty for now)
                 {.shaderDrawParameters = true}, // shader draw parameters from Vulkan 1.1
-                {.dynamicRendering = true}, // dynamic rendering from Vulkan 1.3
+                {.synchronization2 = true, .dynamicRendering = true }, // dynamic rendering from Vulkan 1.3
                 {.extendedDynamicState = true} // extended dynamic state from the extension
             };
 
@@ -287,7 +292,7 @@ class Triangle {
             if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) return capabilities.currentExtent;
 
             int width, height;
-            SDL_GetWindowSize(window, &width, &height);
+            SDL_GetWindowSizeInPixels(window, &width, &height);
 
             return {
                 std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
@@ -493,17 +498,18 @@ class Triangle {
             command_pool = vk::raii::CommandPool(device, poolInfo);
         }
 
-        void create_command_buffer() {
+        void create_command_buffers() {
             vk::CommandBufferAllocateInfo allocInfo {
                 .commandPool = command_pool,
                 .level = vk::CommandBufferLevel::ePrimary,
-                .commandBufferCount = 1
+                .commandBufferCount = MAX_FRAMES_IN_FLIGHT
             };
 
-            command_buffer = std::move(vk::raii::CommandBuffers(device, allocInfo).front());
+            command_buffers = vk::raii::CommandBuffers(device, allocInfo);
         }
 
         void record_command_buffer(uint32_t imageIndex) {
+            auto &command_buffer = command_buffers[frame_index];
             command_buffer.begin({});
 
             // Before starting rendering, transition the swapchain image to vk::ImageLayout::eColorAttachmentOptimal
@@ -568,36 +574,56 @@ class Triangle {
     	    vk::PipelineStageFlags2 dst_stage_mask
         ){
     		vk::ImageMemoryBarrier2 barrier = {
-    		    .srcStageMask        = src_stage_mask,
-    		    .srcAccessMask       = src_access_mask,
-    		    .dstStageMask        = dst_stage_mask,
-    		    .dstAccessMask       = dst_access_mask,
-    		    .oldLayout           = old_layout,
-    		    .newLayout           = new_layout,
+    		    .srcStageMask = src_stage_mask,
+    		    .srcAccessMask = src_access_mask,
+    		    .dstStageMask = dst_stage_mask,
+    		    .dstAccessMask = dst_access_mask,
+    		    .oldLayout = old_layout,
+    		    .newLayout = new_layout,
     		    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     		    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    		    .image               = swapChainImages[imageIndex],
-    		    .subresourceRange    = {
-    		           .aspectMask     = vk::ImageAspectFlagBits::eColor,
-    		           .baseMipLevel   = 0,
-    		           .levelCount     = 1,
+    		    .image = swapChainImages[imageIndex],
+    		    .subresourceRange = {
+    		           .aspectMask = vk::ImageAspectFlagBits::eColor,
+    		           .baseMipLevel = 0,
+    		           .levelCount = 1,
     		           .baseArrayLayer = 0,
-    		           .layerCount     = 1
+    		           .layerCount = 1
                 }
             };
     		vk::DependencyInfo dependency_info = {
-    		    .dependencyFlags         = {},
+    		    .dependencyFlags = {},
     		    .imageMemoryBarrierCount = 1,
-    		    .pImageMemoryBarriers    = &barrier
+    		    .pImageMemoryBarriers = &barrier
             };
 
-            command_buffer.pipelineBarrier2(dependency_info);
+            command_buffers[frame_index].pipelineBarrier2(dependency_info);
         }
 
         void create_sync_objects() {
-            present_complete_semaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-            render_finished_semaphore = vk::raii::Semaphore(device, vk::SemaphoreCreateInfo());
-            draw_fence = vk::raii::Fence(device, { .flags = vk::FenceCreateFlagBits::eSignaled });
+    		assert(present_complete_semaphores.empty() && render_finished_semaphores.empty() && in_flight_fences.empty());
+
+    		for (size_t i = 0; i < swapChainImages.size(); i++) {
+    			render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+    		}
+
+    		for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    			present_complete_semaphores.emplace_back(device, vk::SemaphoreCreateInfo());
+    			in_flight_fences.emplace_back(device, vk::FenceCreateInfo{.flags = vk::FenceCreateFlagBits::eSignaled});
+    		}
+        }
+
+        void cleanup_swap_chain() {
+            swap_chain_image_views.clear();
+            swap_chain = nullptr;
+        }
+
+        void recreate_swap_chain() {
+            device.waitIdle();
+
+            cleanup_swap_chain();
+            create_swap_chain();
+            create_image_views();
         }
 
         void init_vulkan() {
@@ -613,7 +639,7 @@ class Triangle {
             SDL_Log("created surface");
 
             pick_physical_device();
-            SDL_Log("picked physical device");
+            SDL_Log("picked physical device (%s)", physical_device.getProperties().deviceName.data());
 
             create_logical_device();
             SDL_Log("created logical device");
@@ -630,7 +656,7 @@ class Triangle {
             create_command_pool();
             SDL_Log("created command pool");
 
-            create_command_buffer();
+            create_command_buffers();
             SDL_Log("created command buffer");
 
             create_sync_objects();
@@ -638,72 +664,87 @@ class Triangle {
         }
 
         void draw_frame() {
-            auto fenceResult = device.waitForFences(*draw_fence, vk::True, UINT64_MAX);
+           	auto fenceResult = device.waitForFences(*in_flight_fences[frame_index], vk::True, UINT64_MAX);
+      		if (fenceResult != vk::Result::eSuccess) throw std::runtime_error("failed to wait for fence!");
 
-            if (fenceResult != vk::Result::eSuccess) throw std::runtime_error("failed to wait for fence!");
+            auto [result, imageIndex] = swap_chain.acquireNextImage(UINT64_MAX, *present_complete_semaphores[frame_index], nullptr);
 
-    		device.resetFences(*draw_fence);
-            auto [result, imageIndex] = swap_chain.acquireNextImage(UINT64_MAX, *present_complete_semaphore, nullptr);
+            if (result == vk::Result::eErrorOutOfDateKHR || framebuffer_resized) {
+                framebuffer_resized = false;
+                recreate_swap_chain();
+                return;
+            }
 
+            if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+                assert(result == vk::Result::eTimeout || result == vk::Result::eNotReady);
+                throw std::runtime_error("failed to acquire swap chain image!");
+            }
+
+            device.resetFences(*in_flight_fences[frame_index]);
+
+            command_buffers[frame_index].reset();
             record_command_buffer(imageIndex);
+
             graphics_queue.waitIdle();
 
             vk::PipelineStageFlags waitDestinationStageMask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
-            const vk::SubmitInfo   submitInfo{
+            const vk::SubmitInfo submitInfo{
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*present_complete_semaphore,
+                .pWaitSemaphores = &*present_complete_semaphores[frame_index],
                 .pWaitDstStageMask = &waitDestinationStageMask,
                 .commandBufferCount = 1,
-                .pCommandBuffers = &*command_buffer,
+                .pCommandBuffers = &*command_buffers[frame_index],
                 .signalSemaphoreCount = 1,
-                .pSignalSemaphores = &*render_finished_semaphore
+                .pSignalSemaphores = &*render_finished_semaphores[frame_index]
             };
 
-           	graphics_queue.submit(submitInfo, *draw_fence);
+           	graphics_queue.submit(submitInfo, *in_flight_fences[frame_index]);
 
     		const vk::PresentInfoKHR presentInfoKHR {
                 .waitSemaphoreCount = 1,
-                .pWaitSemaphores = &*render_finished_semaphore,
+                .pWaitSemaphores = &*render_finished_semaphores[frame_index],
                 .swapchainCount = 1,
                 .pSwapchains = &*swap_chain,
                 .pImageIndices = &imageIndex
             };
 
             result = graphics_queue.presentKHR(presentInfoKHR);
-    		switch (result)
-    		{
+    		switch (result) {
     			case vk::Result::eSuccess:
     				break;
     			case vk::Result::eSuboptimalKHR:
     				std::cout << "vk::Queue::presentKHR returned vk::Result::eSuboptimalKHR !\n";
     				break;
     			default:
-    				break;        // an unexpected result is returned!
+    				break; // an unexpected result is returned!
     		}
+
+            frame_index = (frame_index + 1) % MAX_FRAMES_IN_FLIGHT;
         }
 
         void main_loop() {
             SDL_Event event;
-            bool is_running = true;
 
             while(is_running) {
-                // SDL_Log("running");
                 draw_frame();
 
                 while (SDL_PollEvent(&event)) {
-                    // SDL_Log("checking input");
-
-                    if(event.type == SDL_EVENT_QUIT) {
+                    if (event.type == SDL_EVENT_QUIT) {
                         is_running = false;
                     }
-                }
 
+                    if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                        framebuffer_resized = true;
+                    }
+                }
             }
 
             device.waitIdle();
         }
 
         void cleanup() {
+            cleanup_swap_chain();
+
             SDL_DestroyWindow(window);
             SDL_Quit();
         }
