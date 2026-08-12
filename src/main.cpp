@@ -1,4 +1,5 @@
 #include <stdexcept>
+#include <utility>
 #include <vector>
 #include <iostream>
 #include <cstdlib>
@@ -8,6 +9,8 @@
 
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_raii.hpp>
+
+#include <glm/glm.hpp>
 
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_log.h>
@@ -25,6 +28,47 @@ bool enable_validation_layers = false;
 bool enable_validation_layers = true;
 #endif
 
+struct Vertex {
+    glm::vec2 pos;
+    glm::vec3 color;
+
+    static vk::VertexInputBindingDescription getBindingDescription() {
+        return {
+            .binding = 0,
+            .stride = sizeof(Vertex),
+            .inputRate = vk::VertexInputRate::eVertex
+        };
+    }
+
+    static std::array<vk::VertexInputAttributeDescription, 2> getAttributeDescriptions() {
+        return {{
+            {
+                .location = 0,
+                .binding = 0,
+                .format = vk::Format::eR32G32Sfloat,
+                .offset = offsetof(Vertex, pos)
+            },
+            {
+                .location = 1,
+                .binding = 0,
+                .format = vk::Format::eR32G32B32Sfloat,
+                .offset = offsetof(Vertex, color)
+            }
+        }};
+    }
+};
+
+const std::vector<Vertex> vertices = {
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+};
+
+const std::vector<uint16_t> indices = {
+    0, 1, 2, 2, 3, 0
+};
+
 class Triangle {
     public:
         void run() {
@@ -37,19 +81,23 @@ class Triangle {
     private:
         SDL_Window* window = nullptr;
 
+        // vulkan instances
         vk::raii::Context context;
         vk::raii::Instance instance = nullptr;
+        vk::raii::SurfaceKHR surface = nullptr;
         vk::raii::DebugUtilsMessengerEXT debug_messenger = nullptr;
 
-        vk::raii::SurfaceKHR surface = nullptr;
+        // surface & devices
         vk::raii::PhysicalDevice physical_device = nullptr;
         vk::raii::Device device = nullptr;
         vk::raii::Queue graphics_queue = nullptr;
+
+        // swap chain
        	vk::raii::SwapchainKHR swap_chain = nullptr;
 
-        std::vector<vk::Image> swapChainImages;
-    	vk::SurfaceFormatKHR swapChainSurfaceFormat;
-    	vk::Extent2D swapChainExtent;
+        std::vector<vk::Image> swap_chain_images;
+    	vk::SurfaceFormatKHR swap_chain_surface_format;
+    	vk::Extent2D swap_chain_extent;
         std::vector<vk::raii::ImageView> swap_chain_image_views;
 
         vk::raii::PipelineLayout pipeline_layout = nullptr;
@@ -60,6 +108,12 @@ class Triangle {
         std::vector<vk::raii::Semaphore> present_complete_semaphores;
         std::vector<vk::raii::Semaphore> render_finished_semaphores;
         std::vector<vk::raii::Fence> in_flight_fences;
+
+        // buffers
+        vk::raii::Buffer vertex_buffer = nullptr;
+        vk::raii::DeviceMemory vertex_buffer_memory = nullptr;
+        vk::raii::Buffer index_buffer = nullptr;
+        vk::raii::DeviceMemory index_buffer_memory = nullptr;
 
         uint32_t queueIndex = ~0;
         uint32_t frame_index = 0;
@@ -312,11 +366,11 @@ class Triangle {
 
         void create_swap_chain() {
             vk::SurfaceCapabilitiesKHR surfaceCapabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-            swapChainExtent = chooseSwapExtent(surfaceCapabilities);
+            swap_chain_extent = chooseSwapExtent(surfaceCapabilities);
             uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
 
             std::vector<vk::SurfaceFormatKHR> availableFormats = physical_device.getSurfaceFormatsKHR(*surface);
-            swapChainSurfaceFormat = choose_swap_surface_format(availableFormats);
+            swap_chain_surface_format = choose_swap_surface_format(availableFormats);
 
             std::vector<vk::PresentModeKHR> availablePresentModes = physical_device.getSurfacePresentModesKHR(*surface);
     		vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
@@ -324,9 +378,9 @@ class Triangle {
     		vk::SwapchainCreateInfoKHR swapChainCreateInfo {
                 .surface = *surface,
                 .minImageCount = minImageCount,
-                .imageFormat = swapChainSurfaceFormat.format,
-                .imageColorSpace = swapChainSurfaceFormat.colorSpace,
-                .imageExtent = swapChainExtent,
+                .imageFormat = swap_chain_surface_format.format,
+                .imageColorSpace = swap_chain_surface_format.colorSpace,
+                .imageExtent = swap_chain_extent,
                 .imageArrayLayers = 1,
                 .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
                 .imageSharingMode = vk::SharingMode::eExclusive,
@@ -337,7 +391,7 @@ class Triangle {
             };
 
     		swap_chain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
-    		swapChainImages = swap_chain.getImages();
+    		swap_chain_images = swap_chain.getImages();
         }
 
         void create_image_views() {
@@ -345,7 +399,7 @@ class Triangle {
 
             vk::ImageViewCreateInfo imageViewCreateInfo {
                 .viewType = vk::ImageViewType::e2D,
-                .format = swapChainSurfaceFormat.format,
+                .format = swap_chain_surface_format.format,
                 .subresourceRange = { vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1 }
             };
 
@@ -362,7 +416,7 @@ class Triangle {
                 .layerCount = 1
             };
 
-            for (auto &image : swapChainImages) {
+            for (auto &image : swap_chain_images) {
                 imageViewCreateInfo.image = image;
                 swap_chain_image_views.emplace_back(device, imageViewCreateInfo);
             }
@@ -409,12 +463,18 @@ class Triangle {
                 .module = shaderModule,
                 .pName = "fragMain"
             };
-    		vk::PipelineShaderStageCreateInfo shaderStages[] = {
-                vertShaderStageInfo, fragShaderStageInfo
+    		vk::PipelineShaderStageCreateInfo shaderStages[] = { vertShaderStageInfo, fragShaderStageInfo };
+
+            auto bindingDescription = Vertex::getBindingDescription();
+            auto attributeDescriptions = Vertex::getAttributeDescriptions();
+            vk::PipelineVertexInputStateCreateInfo vertexInputInfo {
+                .vertexBindingDescriptionCount = 1,
+                .pVertexBindingDescriptions = &bindingDescription,
+                .vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size()),
+                .pVertexAttributeDescriptions = attributeDescriptions.data()
             };
 
-    		vk::PipelineVertexInputStateCreateInfo vertexInputInfo;
-    		vk::PipelineInputAssemblyStateCreateInfo inputAssembly {
+            vk::PipelineInputAssemblyStateCreateInfo inputAssembly {
                 .topology = vk::PrimitiveTopology::eTriangleList
             };
     		vk::PipelineViewportStateCreateInfo viewportState {
@@ -464,7 +524,7 @@ class Triangle {
 
             vk::PipelineRenderingCreateInfo pipelineRenderingCreateInfo {
                 .colorAttachmentCount = 1,
-                .pColorAttachmentFormats = &swapChainSurfaceFormat.format
+                .pColorAttachmentFormats = &swap_chain_surface_format.format
             };
             vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipelineCreateInfoChain = {
                 {
@@ -482,7 +542,7 @@ class Triangle {
                 },
                 {
                     .colorAttachmentCount = 1,
-                    .pColorAttachmentFormats = &swapChainSurfaceFormat.format
+                    .pColorAttachmentFormats = &swap_chain_surface_format.format
                 }
             };
 
@@ -535,7 +595,7 @@ class Triangle {
             vk::RenderingInfo renderingInfo = {
                 .renderArea = {
                     .offset = {0, 0},
-                    .extent = swapChainExtent
+                    .extent = swap_chain_extent
                 },
                 .layerCount = 1,
                 .colorAttachmentCount = 1,
@@ -545,10 +605,12 @@ class Triangle {
             command_buffer.beginRendering(renderingInfo);
             command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, *graphics_pipeline);
 
-            command_buffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swapChainExtent.width), static_cast<float>(swapChainExtent.height), 0.0f, 1.0f));
-            command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swapChainExtent));
-            command_buffer.draw(3, 1, 0, 0);
+            command_buffer.setViewport(0, vk::Viewport(0.0f, 0.0f, static_cast<float>(swap_chain_extent.width), static_cast<float>(swap_chain_extent.height), 0.0f, 1.0f));
+            command_buffer.setScissor(0, vk::Rect2D(vk::Offset2D(0, 0), swap_chain_extent));
 
+            command_buffer.bindVertexBuffers(0, *vertex_buffer, {0});
+            command_buffer.bindIndexBuffer(*index_buffer, 0, vk::IndexTypeValue<decltype(indices)::value_type>::value);
+            command_buffer.drawIndexed(static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
             command_buffer.endRendering();
 
             transition_image_layout(
@@ -582,7 +644,7 @@ class Triangle {
     		    .newLayout = new_layout,
     		    .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
     		    .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-    		    .image = swapChainImages[imageIndex],
+    		    .image = swap_chain_images[imageIndex],
     		    .subresourceRange = {
     		           .aspectMask = vk::ImageAspectFlagBits::eColor,
     		           .baseMipLevel = 0,
@@ -603,7 +665,7 @@ class Triangle {
         void create_sync_objects() {
     		assert(present_complete_semaphores.empty() && render_finished_semaphores.empty() && in_flight_fences.empty());
 
-    		for (size_t i = 0; i < swapChainImages.size(); i++) {
+    		for (size_t i = 0; i < swap_chain_images.size(); i++) {
     			render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo());
     		}
 
@@ -624,6 +686,92 @@ class Triangle {
             cleanup_swap_chain();
             create_swap_chain();
             create_image_views();
+        }
+
+        uint32_t findMemoryType(uint32_t typeFilter, vk::MemoryPropertyFlags properties) {
+            vk::PhysicalDeviceMemoryProperties mem_properties = physical_device.getMemoryProperties();
+
+            for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
+                if ((typeFilter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+                    return i;
+                }
+            }
+
+            throw std::runtime_error("failed to find suitable memory type!");
+        }
+
+        void create_vertex_buffer() {
+            vk::DeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
+
+            auto [stagingBuffer, stagingBufferMemory] = create_buffer(
+                bufferSize,
+                vk::BufferUsageFlagBits::eTransferSrc,
+                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+            );
+
+            void *data = stagingBufferMemory.mapMemory(0, bufferSize);
+            memcpy(data, vertices.data(), bufferSize);
+            stagingBufferMemory.unmapMemory();
+
+            std::tie(vertex_buffer, vertex_buffer_memory) = create_buffer(bufferSize, vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+            copy_buffer(stagingBuffer, vertex_buffer, bufferSize);
+        }
+
+        void create_index_buffer() {
+           	vk::DeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    		auto [stagingBuffer, stagingBufferMemory] = create_buffer(
+                bufferSize,
+                vk::BufferUsageFlagBits::eTransferSrc,
+                vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+            );
+
+    		void *data = stagingBufferMemory.mapMemory(0, bufferSize);
+    		memcpy(data, indices.data(), (size_t) bufferSize);
+    		stagingBufferMemory.unmapMemory();
+
+    		std::tie(index_buffer, index_buffer_memory) = create_buffer(bufferSize, vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eTransferDst, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    		copy_buffer(stagingBuffer, index_buffer, bufferSize);
+        }
+
+        void copy_buffer(vk::raii::Buffer & srcBuffer, vk::raii::Buffer & dstBuffer, vk::DeviceSize size) {
+            vk::CommandBufferAllocateInfo allocInfo{
+                .commandPool = command_pool,
+                .level = vk::CommandBufferLevel::ePrimary,
+                .commandBufferCount = 1
+            };
+
+            vk::raii::CommandBuffer commandCopyBuffer = std::move(device.allocateCommandBuffers(allocInfo).front());
+
+            commandCopyBuffer.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+            commandCopyBuffer.copyBuffer(*srcBuffer, *dstBuffer, vk::BufferCopy(0, 0, size));
+            commandCopyBuffer.end();
+
+            graphics_queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &*commandCopyBuffer}, nullptr);
+            graphics_queue.waitIdle();
+        }
+
+        std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size, vk::BufferUsageFlags usage, vk::MemoryPropertyFlags properties) {
+            vk::BufferCreateInfo bufferInfo {
+                .size = size,
+                .usage = usage,
+                .sharingMode = vk::SharingMode::eExclusive
+            };
+            vk::raii::Buffer buffer = vk::raii::Buffer(device, bufferInfo);
+
+            vk::MemoryRequirements memRequirements = buffer.getMemoryRequirements();
+            vk::MemoryAllocateInfo allocInfo {
+                .allocationSize = memRequirements.size,
+                .memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
+            };
+
+            vk::raii::DeviceMemory bufferMemory = vk::raii::DeviceMemory(device, allocInfo);
+            buffer.bindMemory(*bufferMemory, 0);
+
+            return {
+                std::move(buffer),
+                std::move(bufferMemory)
+            };
         }
 
         void init_vulkan() {
@@ -655,6 +803,12 @@ class Triangle {
 
             create_command_pool();
             SDL_Log("created command pool");
+
+            create_vertex_buffer();
+            SDL_Log("created vertex buffer");
+
+            create_index_buffer();
+            SDL_Log("created index buffer");
 
             create_command_buffers();
             SDL_Log("created command buffer");
