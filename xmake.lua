@@ -28,11 +28,13 @@ add_requires("imgui v1.92.7-docking", {
 target("evolution-renderer")
     set_kind("binary")
     add_files("src/*.cpp")
-
-    add_defines("VULKAN_HPP_NO_STRUCT_CONSTRUCTORS")
+    add_includedirs("src")
+    add_cxflags("-ferror-limit=0", { tools = { "clang", "clangxx" }})
 
     add_packages("vulkan-headers")
     add_packages("vulkan-loader")
+    add_packages("vulkan-memory-allocator")
+    add_packages("volk")
 
     add_packages("glm")
     add_packages("fmt")
