@@ -1,3 +1,4 @@
+/*
 #include <array>
 #include <cstdint>
 #include <cstdlib>
@@ -531,3 +532,4 @@ void draw_frame() {
 
     frame_index = (frame_index + 1) % MAX_FRAMES_IN_FLIGHT;
 }
+ */

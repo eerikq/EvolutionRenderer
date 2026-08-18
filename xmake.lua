@@ -17,19 +17,19 @@ add_requires("glm 1.0.3")
 add_requires("fmt 12.2.0")
 add_requires("libsdl3 3.4.12")
 add_requires("imgui v1.92.7-docking", {
-	configs = {
-		sdl3 = true,
-		sdl3_renderer = true,
-		vulkan = true,
+    configs = {
+        sdl3 = true,
+        sdl3_renderer = true,
+        vulkan = true,
         volk = true,
-	},
+    },
 })
 
 target("evolution-renderer")
     set_kind("binary")
-    add_files("src/*.cpp")
+    add_files("src/**.cpp")
     add_includedirs("src")
-    add_cxflags("-ferror-limit=0", { tools = { "clang", "clangxx" }})
+    add_cxflags("-ferror-limit=0", { tools = { "clang", "clangxx" } })
 
     add_packages("vulkan-headers")
     add_packages("vulkan-loader")

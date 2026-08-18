@@ -1,9 +1,9 @@
 #include "platform/window.h"
 #include "renderer/vulkan_instance.h"
 #include "types/vertex.h"
+#include "util/log.h"
 #include "vulkan_context.h"
 
-#include <SDL3/SDL_log.h>
 #include <glm/glm.hpp>
 
 constexpr int window_width = 1200;
@@ -14,10 +14,14 @@ const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
     {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
     {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
 };
 
 const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+
+constexpr std::array<char const*, 1> required_device_extensions = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+};
 
 VulkanContext context;
 
@@ -25,6 +29,8 @@ class Renderer {
   public:
     void run() {
         windowCreate(window_width, window_height);
+        evoLog(PrintSeverity::Info, "Created Window. (SDL)");
+
         init_vulkan();
         main_loop();
         cleanup();
@@ -69,79 +75,84 @@ class Renderer {
     bool is_running = true;
 
     void init_vulkan() {
+
         // vulkan initialization
         volkInitialize();
-        SDL_Log("initializing volk");
+        evoLog(PrintSeverity::Debug, "Initialized Volk.");
 
         vulkanCreateInstance(&context.instance);
-        SDL_Log("created instance");
+        evoLog(PrintSeverity::Info, "Created Vulkan Instance.");
+
         volkLoadInstance(context.instance);
-        SDL_Log("loading vkInstance into volk");
-        setup_debug_messenger();
-        SDL_Log("setup debug messenger");
+        evoLog(PrintSeverity::Warn, "Loading vkInstance into Volk.");
+
+        vulkanCreateDebugMessenger(context.instance, &context.debug_messenger);
+        evoLog(PrintSeverity::Error, "Created Debug Messenger.");
         // vulkan initialization
 
         // windowing
-        windowCreateSurface(context.instance, context.surface);
-        SDL_Log("created surface");
+        windowCreateSurface(context.instance, &context.surface);
+        evoLog(PrintSeverity::Fatal, "Created Window Surface. (Vulkan)");
         // windowing
 
-        // device
-        pick_physical_device();
-        SDL_Log("picked physical device (%s)", physical_device.getProperties().deviceName.data());
-        create_logical_device();
-        SDL_Log("created logical device");
-        volkLoadDevice(device);
-        SDL_Log("loading vkDevice into volk");
-        // device
+        /*
+            // device
+            pick_physical_device();
+            SDL_Log("picked physical device (%s)", physical_device.getProperties().deviceName.data());
+            create_logical_device();
+            SDL_Log("created logical device");
+            volkLoadDevice(device);
+            SDL_Log("loading vkDevice into volk");
+            // device
 
-        // swap chain
-        create_swap_chain();
-        SDL_Log("created swap chain");
-        create_image_views();
-        SDL_Log("created image views");
-        create_graphics_pipeline();
-        SDL_Log("created graphics pipeline");
-        create_command_pool();
-        SDL_Log("created command pool");
-        // swap chain
+            // swap chain
+            create_swap_chain();
+            SDL_Log("created swap chain");
+            create_image_views();
+            SDL_Log("created image views");
+            create_graphics_pipeline();
+            SDL_Log("created graphics pipeline");
+            create_command_pool();
+            SDL_Log("created command pool");
+            // swap chain
 
-        // buffers
-        create_vertex_buffer();
-        SDL_Log("created vertex buffer");
-        create_index_buffer();
-        SDL_Log("created index buffer");
-        create_command_buffers();
-        SDL_Log("created command buffer");
-        // buffers
+            // buffers
+            create_vertex_buffer();
+            SDL_Log("created vertex buffer");
+            create_index_buffer();
+            SDL_Log("created index buffer");
+            create_command_buffers();
+            SDL_Log("created command buffer");
+            // buffers
 
-        create_sync_objects();
-        SDL_Log("created sync objects");
+            create_sync_objects();
+            SDL_Log("created sync objects");
+        */
     }
 
     void main_loop() {
-        SDL_Event event;
 
         while (is_running) {
-            draw_frame();
+            /*
+                SDL_Event event;
+                //draw_frame();
 
-            while (SDL_PollEvent(&event)) {
-                if (event.type == SDL_EVENT_QUIT) {
-                    is_running = false;
-                } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-                    framebuffer_resized = true;
+                while (SDL_PollEvent(&event)) {
+                    if (event.type == SDL_EVENT_QUIT) {
+                        is_running = false;
+                    } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                        framebuffer_resized = true;
+                    }
                 }
-            }
+            */
         }
-
-        device.waitIdle();
     }
 
     void cleanup() {
-        vkDestroyInstance(context.instance, nullptr);
-        cleanup_swap_chain();
+        windowDestroySurface(context.instance, &context.surface);
+        vulkanDestroyDebugMessenger(context.instance, &context.debug_messenger);
+        vulkanDestroyInstance(&context.instance);
 
-        windowDestroySurface(context.instance, context.surface);
         windowDestroy();
     }
 };
@@ -151,7 +162,7 @@ int main() {
         Renderer program;
         program.run();
     } catch (const std::exception& e) {
-        SDL_Log("Couldn't start the renderer! %s", e.what());
+        evoLog(PrintSeverity::Info, "Couldn't start the renderer! {}", e.what());
         return EXIT_FAILURE;
     }
 

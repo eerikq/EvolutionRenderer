@@ -22,7 +22,7 @@ Standard: c++20
 BasedOnStyle: LLVM
 
 # Layout
-ColumnLimit: 150
+ColumnLimit: 160
 IndentWidth: 4
 UseTab: Never
 
@@ -32,7 +32,7 @@ AllowShortFunctionsOnASingleLine: None
 AllowShortIfStatementsOnASingleLine: WithoutElse
 AllowShortLoopsOnASingleLine: false
 AllowShortLambdasOnASingleLine: None
-AllowShortCaseLabelsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: true
 
 # Braces Formatting
 BreakBeforeBraces: Custom
@@ -69,4 +69,7 @@ IncludeBlocks: Regroup
 # Misc
 AllowAllParametersOfDeclarationOnNextLine: false
 Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: true
 BinPackParameters: true
+AlwaysBreakTemplateDeclarations: Yes
+IndentCaseLabels: true

@@ -1,32 +1,74 @@
 #include "vulkan_instance.h"
 
 #include "../platform/window.h"
+#include "util/log.h"
 
-#include <SDL3/SDL_log.h>
 #include <array>
+#include <cstring>
 #include <vector>
 
-#if NDEBUG
+#ifdef NDEBUG
 constexpr bool enable_validation_layers = false;
 #else
 constexpr bool enable_validation_layers = true;
 #endif
 
-// forward declaration. kinda goofy but what can you do
-std::vector<const char*> get_required_intance_extensions();
-
 constexpr std::array<char const*, 1> validation_layers = {
     "VK_LAYER_KHRONOS_validation",
 };
 
-constexpr std::array<char const*, 1> required_device_extension = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-};
+static bool validateInstanceLayers(uint32_t layers_count, char const* const* layers_names) {
+    uint32_t layer_property_count = 0;
+    vkEnumerateInstanceLayerProperties(&layer_property_count, nullptr);
 
-void vulkanInitialize(VkInstance* instance) {
-    SDL_Log("Initiating Vulkan. Validation Layers Enabled: %b", enable_validation_layers);
+    std::vector<VkLayerProperties> layer_properties(layer_property_count);
+    vkEnumerateInstanceLayerProperties(&layer_property_count, layer_properties.data());
 
-    constexpr VkApplicationInfo appInfo = {
+    for (uint32_t i = 0; i < layers_count; i++) {
+        bool found_layer = false;
+
+        for (uint32_t j = 0; j < layer_property_count; j++) {
+            found_layer = strcmp(layers_names[i], layer_properties[j].layerName) == 0;
+            if (found_layer) break;
+        }
+
+        if (!found_layer) {
+            evoLog(PrintSeverity::Warn, "Required layer not supported: {}", layers_names[i]);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static bool validateInstanceExtensions(uint32_t extensions_count, char const* const* extensions_names) {
+    uint32_t extension_property_count = 0;
+    vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, nullptr);
+
+    std::vector<VkExtensionProperties> extension_properties(extension_property_count);
+    vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, extension_properties.data());
+
+    for (uint32_t i = 0; i < extensions_count; i++) {
+        bool found_extension = false;
+
+        for (uint32_t j = 0; j < extension_property_count; j++) {
+            found_extension = strcmp(extensions_names[i], extension_properties[j].extensionName) == 0;
+            if (found_extension) break;
+        }
+
+        if (!found_extension) {
+            evoLog(PrintSeverity::Warn, "Required extension not supported: {}", extensions_names[i]);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+VkResult vulkanCreateInstance(VkInstance* instance) {
+    evoLog(PrintSeverity::Info, "Creating Vulkan Instance. Validation Layers: {}.", enable_validation_layers ? "Enabled" : "Disabled");
+
+    constexpr VkApplicationInfo app_info {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "Evolution Renderer",
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
@@ -35,111 +77,65 @@ void vulkanInitialize(VkInstance* instance) {
         .apiVersion = VK_API_VERSION_1_4,
     };
 
-    // this one's kinda confusing, but the gist is that you can change what required_layers_names points towards (although it has to be
-    // another, "inner" pointer), but you cant change what that inner pointer is pointing at, nor the underlying char values of that pointer.
-    char const* const* required_layers_names = enable_validation_layers ? validation_layers.data() : nullptr;
-    uint32_t required_layers_count = enable_validation_layers ? static_cast<uint32_t>(validation_layers.size()) : 0;
+    // instance (validation) layers
+    uint32_t validation_layers_count = enable_validation_layers ? static_cast<uint32_t>(validation_layers.size()) : 0;
+    char const* const* validation_layers_names = enable_validation_layers ? validation_layers.data() : nullptr;
 
-    uint32_t property_count;
-    vkEnumerateInstanceLayerProperties(&property_count, nullptr);
-    // unsure how i feel about the vector use here. ideally i wouldn't, but doing this with arrays is way uglier.
-    // also the vector is just in the function's local scope, so its just a one time thing that is very controlled so it gets a pass.
-    std::vector<VkLayerProperties> layer_properties(property_count);
-    vkEnumerateInstanceLayerProperties(&property_count, layer_properties.data());
+    if (!validateInstanceLayers(validation_layers_count, validation_layers_names)) return VK_ERROR_LAYER_NOT_PRESENT;
 
-    if (enable_validation_layers) {
-        for (int i = 0; i < required_layers_count; i++) {
-            bool found_layers = strcmp(layer_properties.data()->layerName, required_layers_names) == 0;
+    // instance extensions
+    uint32_t extensions_count = 0;
+    char const* const* extension_names = windowGetInstanceExtensions(&extensions_count);
 
-            if (!found_layers) {
-                SDL_Log("Required layer not supported: %s", "get the layer here later");
-                break;
-            }
-        }
+    std::vector extensions(extension_names, extension_names + extensions_count);
+    if (enable_validation_layers) extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    // append "VK_EXT_DEBUG_UTILS_EXTENSION_NAME" to the end of extensions to enable validation layers
 
-        /*
-        auto unsupportedLayerIt = std::ranges::find_if(required_layers_names, [&layer_properties](auto const& requiredLayer) {
-            return std::ranges::none_of(layer_properties, [requiredLayer](auto const& layerProperty) {
-                return strcmp(layerProperty.layerName, requiredLayer) == 0;
-            });
-        });
+    if (!validateInstanceExtensions(static_cast<uint32_t>(extensions.size()), extensions.data())) return VK_ERROR_EXTENSION_NOT_PRESENT;
 
-        if (unsupportedLayerIt != required_layers_names.end()) {
-            throw std::runtime_error("Required layer not supported: " + std::string(*unsupportedLayerIt));
-        }
-        */
-    }
-
-    //
-    // the following 15 lines are basically the same as whatever happens above
-    //
-
-    // get_required_intance_extensions() is defined lower down
-    std::vector<const char*> required_extensions = get_required_intance_extensions();
-
-    // check if the required extensions are supported by the Vulkan implementation
-    auto extensionProperties = context.enumerateInstanceExtensionProperties();
-    auto unsupportedPropertyIt = std::ranges::find_if(required_extensions, [&extensionProperties](auto const& requiredExtension) {
-        return std::ranges::none_of(extensionProperties, [requiredExtension](auto const& extensionProperty) {
-            return strcmp(extensionProperty.extensionName, requiredExtension) == 0;
-        });
-    });
-
-    if (unsupportedPropertyIt != required_extensions.end()) {
-        throw std::runtime_error("Required extension not supported: " + std::string(*unsupportedPropertyIt));
-    }
-
-    VkInstanceCreateInfo createInfo = {
-        .pApplicationInfo = &appInfo,
-        .enabledLayerCount = required_layers_count,
-        .ppEnabledLayerNames = required_layers_names,
-        .enabledExtensionCount = static_cast<uint32_t>(required_extensions.size()),
-        .ppEnabledExtensionNames = required_extensions.data(),
+    VkInstanceCreateInfo create_info {
+        .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+        .pApplicationInfo = &app_info,
+        .enabledLayerCount = validation_layers_count,
+        .ppEnabledLayerNames = validation_layers_names,
+        .enabledExtensionCount = static_cast<uint32_t>(extensions.size()),
+        .ppEnabledExtensionNames = extensions.data(),
     };
 
-    vkCreateInstance(&createInfo, nullptr, &instance);
-    // would be nice to have this return a VkResult just in case, but i dont know enough about that yet.
+    return vkCreateInstance(&create_info, nullptr, instance);
 }
 
-void vulkanCleanup(VkInstance instance) {
-    vkDestroyInstance(instance, nullptr);
+void vulkanDestroyInstance(VkInstance* instance) {
+    vkDestroyInstance(*instance, nullptr);
 }
 
-std::vector<const char*> get_required_intance_extensions() {
-    uint32_t instance_extensions_count = 0;
-    char const* const* instance_extensions = windowGetInstanceExtensions(&instance_extensions_count);
-
-    std::vector extensions(instance_extensions, instance_extensions + instance_extensions_count);
-    if (enable_validation_layers) {
-        // append "vk::EXTDebugUtilsExtensionName" to the end of extensions to enable validation layers
-        extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-
-    return extensions;
-}
-
-void setup_debug_messenger() {
-    if (!enable_validation_layers) return;
-
-    vk::DebugUtilsMessageSeverityFlagsEXT severityFlags(
-        vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError
-    );
-    vk::DebugUtilsMessageTypeFlagsEXT messageTypeFlags(
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance |
-        vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-    );
-    vk::DebugUtilsMessengerCreateInfoEXT debugUtilsMessengerCreateInfoEXT{
-        .messageSeverity = severityFlags, .messageType = messageTypeFlags, .pfnUserCallback = &debug_callback
-    };
-
-    debug_messenger = instance.createDebugUtilsMessengerEXT(debugUtilsMessengerCreateInfoEXT);
-}
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-    vk::DebugUtilsMessageSeverityFlagBitsEXT severity, vk::DebugUtilsMessageTypeFlagsEXT type,
-    const vk::DebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData
+static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
+    void* p_user_data
 ) {
-    std::cerr << "validation layer: type " << to_string(type) << " msg: " << pCallbackData->pMessage << std::endl;
+    evoLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
+    return VK_FALSE;
+}
 
-    return vk::False;
+VkResult vulkanCreateDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
+    if (!enable_validation_layers) {
+        evoLog(PrintSeverity::Warn, "Validation Layers are disabled! Debug Messenger will not be created.");
+        return VK_SUCCESS;
+    }
+
+    VkDebugUtilsMessageSeverityFlagsEXT severity_flags = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    VkDebugUtilsMessageTypeFlagsEXT message_type_flags =
+        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+    VkDebugUtilsMessengerCreateInfoEXT create_info {
+        .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
+        .messageSeverity = severity_flags,
+        .messageType = message_type_flags,
+        .pfnUserCallback = &debugCallback,
+    };
+
+    return vkCreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, debug_messenger);
+}
+
+void vulkanDestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
+    vkDestroyDebugUtilsMessengerEXT(instance, *debug_messenger, nullptr);
 }
