@@ -11,16 +11,17 @@ bool windowCreate(int window_width, int window_height) {
     SDL_SetAppMetadata("Evolution Renderer", "1.0.0", "eerikq.evolution-renderer");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        evoLog(PrintSeverity::Error, "Couldn't initialize SDL: {}", SDL_GetError());
+        debugLog(PrintSeverity::Error, "Failed to initialize SDL: {}", SDL_GetError());
         return false;
     }
 
     window = SDL_CreateWindow("Evolution Renderer", window_width, window_height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
     if (!window) {
-        evoLog(PrintSeverity::Error, "Couldn't create window or renderer: {}", SDL_GetError());
+        debugLog(PrintSeverity::Error, "Failed to create window: {}", SDL_GetError());
         return false;
     }
 
+    debugLog(PrintSeverity::Info, "Created window");
     return true;
 }
 
@@ -29,16 +30,17 @@ void windowDestroy() {
     SDL_Quit();
 }
 
-bool windowCreateSurface(VkInstance instance, VkSurfaceKHR* surface) {
+bool windowCreateSurface(const VkInstance instance, VkSurfaceKHR* surface) {
     if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, surface)) {
-        evoLog(PrintSeverity::Error, "Couldn't create a Vulkan Surface: {}", SDL_GetError());
+        debugLog(PrintSeverity::Error, "Failed to create a Vulkan surface: {}", SDL_GetError());
         return false;
     }
 
+    debugLog(PrintSeverity::Info, "Created window surface");
     return true;
 }
 
-void windowDestroySurface(VkInstance instance, VkSurfaceKHR* surface) {
+void windowDestroySurface(const VkInstance instance, VkSurfaceKHR* surface) {
     SDL_Vulkan_DestroySurface(instance, *surface, nullptr);
     *surface = VK_NULL_HANDLE;
 }
@@ -50,7 +52,7 @@ const char* const* windowGetInstanceExtensions(uint32_t* count) {
 // returns size in pixels to account for screen scaling (common on laptops)
 bool windowGetSize(int* width, int* height) {
     if (!SDL_GetWindowSizeInPixels(window, width, height)) {
-        evoLog(PrintSeverity::Error, "Couldn't Get Window Size. {}", SDL_GetError());
+        debugLog(PrintSeverity::Error, "Failed to get window size: {}", SDL_GetError());
         return false;
     }
 

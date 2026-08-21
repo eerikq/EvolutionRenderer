@@ -3,10 +3,8 @@
 #include <volk.h>
 
 typedef struct VulkanContext {
-    // vulkan_instance.cpp
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debug_messenger;
+    VkInstance instance = VK_NULL_HANDLE;
+    VkDebugUtilsMessengerEXT debug_messenger = VK_NULL_HANDLE;
 
-    // window.cpp
-    VkSurfaceKHR surface;
+    VkSurfaceKHR surface = VK_NULL_HANDLE;
 } VulkanContext;

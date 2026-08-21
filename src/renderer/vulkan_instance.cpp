@@ -13,11 +13,11 @@ constexpr bool enable_validation_layers = false;
 constexpr bool enable_validation_layers = true;
 #endif
 
-constexpr std::array<char const*, 1> validation_layers = {
+constexpr std::array<const char*, 1> required_validation_layers = {
     "VK_LAYER_KHRONOS_validation",
 };
 
-static bool validateInstanceLayers(uint32_t layers_count, char const* const* layers_names) {
+static bool validateInstanceLayers(const uint32_t layers_count, const char* const* layers_names) {
     uint32_t layer_property_count = 0;
     vkEnumerateInstanceLayerProperties(&layer_property_count, nullptr);
 
@@ -33,7 +33,7 @@ static bool validateInstanceLayers(uint32_t layers_count, char const* const* lay
         }
 
         if (!found_layer) {
-            evoLog(PrintSeverity::Warn, "Required layer not supported: {}", layers_names[i]);
+            debugLog(PrintSeverity::Error, "Required layer not supported: {}", layers_names[i]);
             return false;
         }
     }
@@ -41,7 +41,7 @@ static bool validateInstanceLayers(uint32_t layers_count, char const* const* lay
     return true;
 }
 
-static bool validateInstanceExtensions(uint32_t extensions_count, char const* const* extensions_names) {
+static bool validateInstanceExtensions(const uint32_t extensions_count, const char* const* extensions_names) {
     uint32_t extension_property_count = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extension_property_count, nullptr);
 
@@ -57,7 +57,7 @@ static bool validateInstanceExtensions(uint32_t extensions_count, char const* co
         }
 
         if (!found_extension) {
-            evoLog(PrintSeverity::Warn, "Required extension not supported: {}", extensions_names[i]);
+            debugLog(PrintSeverity::Error, "Required extension not supported: {}", extensions_names[i]);
             return false;
         }
     }
@@ -66,8 +66,6 @@ static bool validateInstanceExtensions(uint32_t extensions_count, char const* co
 }
 
 VkResult vulkanCreateInstance(VkInstance* instance) {
-    evoLog(PrintSeverity::Info, "Creating Vulkan Instance. Validation Layers: {}.", enable_validation_layers ? "Enabled" : "Disabled");
-
     constexpr VkApplicationInfo app_info {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = "Evolution Renderer",
@@ -78,14 +76,14 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
     };
 
     // instance (validation) layers
-    uint32_t validation_layers_count = enable_validation_layers ? static_cast<uint32_t>(validation_layers.size()) : 0;
-    char const* const* validation_layers_names = enable_validation_layers ? validation_layers.data() : nullptr;
+    uint32_t validation_layers_count = enable_validation_layers ? static_cast<uint32_t>(required_validation_layers.size()) : 0;
+    const char* const* validation_layers_names = enable_validation_layers ? required_validation_layers.data() : nullptr;
 
     if (!validateInstanceLayers(validation_layers_count, validation_layers_names)) return VK_ERROR_LAYER_NOT_PRESENT;
 
     // instance extensions
     uint32_t extensions_count = 0;
-    char const* const* extension_names = windowGetInstanceExtensions(&extensions_count);
+    const char* const* extension_names = windowGetInstanceExtensions(&extensions_count);
 
     std::vector extensions(extension_names, extension_names + extensions_count);
     if (enable_validation_layers) extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -102,6 +100,7 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
         .ppEnabledExtensionNames = extensions.data(),
     };
 
+    debugLog(PrintSeverity::Info, "Created Vulkan instance. Validation layers: {}", enable_validation_layers ? "Enabled" : "Disabled");
     return vkCreateInstance(&create_info, nullptr, instance);
 }
 
@@ -113,19 +112,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
     void* p_user_data
 ) {
-    evoLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
+    debugLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
     return VK_FALSE;
 }
 
-VkResult vulkanCreateDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
+VkResult vulkanCreateDebugMessenger(const VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
     if (!enable_validation_layers) {
-        evoLog(PrintSeverity::Warn, "Validation Layers are disabled! Debug Messenger will not be created.");
+        debugLog(PrintSeverity::Warn, "Validation layers are disabled! Debug messenger will not be created");
         return VK_SUCCESS;
     }
 
     VkDebugUtilsMessageSeverityFlagsEXT severity_flags = VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    VkDebugUtilsMessageTypeFlagsEXT message_type_flags =
-        VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
+    VkDebugUtilsMessageTypeFlagsEXT message_type_flags = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT |
+                                                         VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT;
     VkDebugUtilsMessengerCreateInfoEXT create_info {
         .sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT,
         .messageSeverity = severity_flags,
@@ -133,9 +132,10 @@ VkResult vulkanCreateDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEX
         .pfnUserCallback = &debugCallback,
     };
 
+    debugLog(PrintSeverity::Info, "Created debug messenger");
     return vkCreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, debug_messenger);
 }
 
-void vulkanDestroyDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
+void vulkanDestroyDebugMessenger(const VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
     vkDestroyDebugUtilsMessengerEXT(instance, *debug_messenger, nullptr);
 }

@@ -1,4 +1,6 @@
+#include "device_context.h"
 #include "platform/window.h"
+#include "renderer/device.h"
 #include "renderer/vulkan_instance.h"
 #include "types/vertex.h"
 #include "util/log.h"
@@ -19,30 +21,19 @@ const std::vector<Vertex> vertices = {
 
 const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
-constexpr std::array<char const*, 1> required_device_extensions = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-};
-
-VulkanContext context;
+VulkanContext vulkan_context;
+DeviceContext device_context;
 
 class Renderer {
   public:
     void run() {
         windowCreate(window_width, window_height);
-        evoLog(PrintSeverity::Info, "Created Window. (SDL)");
-
         init_vulkan();
         main_loop();
         cleanup();
     }
 
   private:
-    // devices
-    VkPhysicalDevice physical_device = nullptr;
-    VkDevice device = nullptr;
-    VkQueue graphics_queue = nullptr;
-    // devices
-
     // swap chain
     VkSwapchainKHR swap_chain = nullptr;
     std::vector<VkImage> swap_chain_images;
@@ -75,36 +66,22 @@ class Renderer {
     bool is_running = true;
 
     void init_vulkan() {
-
         // vulkan initialization
-        volkInitialize();
-        evoLog(PrintSeverity::Debug, "Initialized Volk.");
-
-        vulkanCreateInstance(&context.instance);
-        evoLog(PrintSeverity::Info, "Created Vulkan Instance.");
-
-        volkLoadInstance(context.instance);
-        evoLog(PrintSeverity::Warn, "Loading vkInstance into Volk.");
-
-        vulkanCreateDebugMessenger(context.instance, &context.debug_messenger);
-        evoLog(PrintSeverity::Error, "Created Debug Messenger.");
-        // vulkan initialization
+        volkInitialize(); // add a check here later to ensure VK_SUCCESS is returned
+        vulkanCreateInstance(&vulkan_context.instance);
+        volkLoadInstance(vulkan_context.instance);
+        vulkanCreateDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
 
         // windowing
-        windowCreateSurface(context.instance, &context.surface);
-        evoLog(PrintSeverity::Fatal, "Created Window Surface. (Vulkan)");
-        // windowing
+        windowCreateSurface(vulkan_context.instance, &vulkan_context.surface);
+
+        // device
+        devicePickPhysicalDevice(vulkan_context.instance, &device_context.physical_device);
+        deviceCreateLogicalDevice(device_context.physical_device, vulkan_context.surface, &device_context.graphics_queue_index, &device_context.logical_device);
+        volkLoadDevice(device_context.logical_device);
+        deviceGetQueue(device_context.logical_device, device_context.graphics_queue_index, &device_context.graphics_queue);
 
         /*
-            // device
-            pick_physical_device();
-            SDL_Log("picked physical device (%s)", physical_device.getProperties().deviceName.data());
-            create_logical_device();
-            SDL_Log("created logical device");
-            volkLoadDevice(device);
-            SDL_Log("loading vkDevice into volk");
-            // device
-
             // swap chain
             create_swap_chain();
             SDL_Log("created swap chain");
@@ -149,9 +126,9 @@ class Renderer {
     }
 
     void cleanup() {
-        windowDestroySurface(context.instance, &context.surface);
-        vulkanDestroyDebugMessenger(context.instance, &context.debug_messenger);
-        vulkanDestroyInstance(&context.instance);
+        windowDestroySurface(vulkan_context.instance, &vulkan_context.surface);
+        vulkanDestroyDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
+        vulkanDestroyInstance(&vulkan_context.instance);
 
         windowDestroy();
     }
@@ -162,7 +139,7 @@ int main() {
         Renderer program;
         program.run();
     } catch (const std::exception& e) {
-        evoLog(PrintSeverity::Info, "Couldn't start the renderer! {}", e.what());
+        debugLog(PrintSeverity::Fatal, "{}", e.what());
         return EXIT_FAILURE;
     }
 

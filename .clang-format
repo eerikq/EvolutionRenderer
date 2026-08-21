@@ -24,6 +24,7 @@ BasedOnStyle: LLVM
 # Layout
 ColumnLimit: 160
 IndentWidth: 4
+PenaltyBreakAssignment: 128
 UseTab: Never
 
 # Short Blocks
@@ -70,6 +71,11 @@ IncludeBlocks: Regroup
 AllowAllParametersOfDeclarationOnNextLine: false
 Cpp11BracedListStyle: true
 SpaceBeforeCpp11BracedList: true
-BinPackParameters: true
+BinPackParameters: false
 AlwaysBreakTemplateDeclarations: Yes
 IndentCaseLabels: true
+NamespaceIndentation: All
+AlignOperands: Align
+BreakBeforeBinaryOperators: None
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000
