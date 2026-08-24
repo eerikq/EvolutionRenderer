@@ -11,17 +11,17 @@ bool windowCreate(int window_width, int window_height) {
     SDL_SetAppMetadata("Evolution Renderer", "1.0.0", "eerikq.evolution-renderer");
 
     if (!SDL_Init(SDL_INIT_VIDEO)) {
-        debugLog(PrintSeverity::Error, "Failed to initialize SDL: {}", SDL_GetError());
+        evoLog(PrintSeverity::Error, "Failed to initialize SDL: {}", SDL_GetError());
         return false;
     }
 
     window = SDL_CreateWindow("Evolution Renderer", window_width, window_height, SDL_WINDOW_RESIZABLE | SDL_WINDOW_VULKAN);
     if (!window) {
-        debugLog(PrintSeverity::Error, "Failed to create window: {}", SDL_GetError());
+        evoLog(PrintSeverity::Error, "Failed to create window: {}", SDL_GetError());
         return false;
     }
 
-    debugLog(PrintSeverity::Info, "Created window");
+    evoLog(PrintSeverity::Info, "Created window");
     return true;
 }
 
@@ -32,11 +32,11 @@ void windowDestroy() {
 
 bool windowCreateSurface(const VkInstance instance, VkSurfaceKHR* surface) {
     if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, surface)) {
-        debugLog(PrintSeverity::Error, "Failed to create a Vulkan surface: {}", SDL_GetError());
+        evoLog(PrintSeverity::Error, "Failed to create a Vulkan surface: {}", SDL_GetError());
         return false;
     }
 
-    debugLog(PrintSeverity::Info, "Created window surface");
+    evoLog(PrintSeverity::Info, "Created window surface");
     return true;
 }
 
@@ -52,7 +52,7 @@ const char* const* windowGetInstanceExtensions(uint32_t* count) {
 // returns size in pixels to account for screen scaling (common on laptops)
 bool windowGetSize(int* width, int* height) {
     if (!SDL_GetWindowSizeInPixels(window, width, height)) {
-        debugLog(PrintSeverity::Error, "Failed to get window size: {}", SDL_GetError());
+        evoLog(PrintSeverity::Error, "Failed to get window size: {}", SDL_GetError());
         return false;
     }
 

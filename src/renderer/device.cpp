@@ -49,7 +49,7 @@ static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* devic
         }
 
         if (!found_extension) {
-            debugLog(PrintSeverity::Warn, "Required extension not supported: {}", required_device_extensions[i]);
+            evoLog(PrintSeverity::Warn, "Required extension not supported: {}", required_device_extensions[i]);
             return false;
         }
     }
@@ -95,12 +95,12 @@ bool devicePickPhysicalDevice(const VkInstance instance, VkPhysicalDevice* physi
     for (uint32_t i = 0; i < physical_device_count; i++) {
         if (isDeviceSuitable(physical_devices[i], device_name)) {
             *physical_device = physical_devices[i];
-            debugLog(PrintSeverity::Info, "Picked physical device: {}", device_name);
+            evoLog(PrintSeverity::Info, "Picked physical device: {}", device_name);
             return true;
         }
     }
 
-    debugLog(PrintSeverity::Error, "Failed to find a suitable GPU!");
+    evoLog(PrintSeverity::Error, "Failed to find a suitable GPU!");
     return false;
 }
 
@@ -169,7 +169,7 @@ VkResult deviceCreateLogicalDevice(
         .ppEnabledExtensionNames = required_device_extensions.data()
     };
 
-    debugLog(PrintSeverity::Info, "Created logical device");
+    evoLog(PrintSeverity::Info, "Created logical device");
     return vkCreateDevice(physical_device, &device_create_info, nullptr, logical_device);
 }
 

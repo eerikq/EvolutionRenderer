@@ -24,7 +24,7 @@ BasedOnStyle: LLVM
 # Layout
 ColumnLimit: 160
 IndentWidth: 4
-PenaltyBreakAssignment: 128
+PenaltyBreakAssignment: 2048
 UseTab: Never
 
 # Short Blocks

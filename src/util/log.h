@@ -8,7 +8,7 @@ enum class PrintSeverity { Debug, Info, Warn, Error, Fatal };
 // Example Log:
 // [03:18:23][ERROR] This is an error message.
 template <typename... T>
-void debugLog(PrintSeverity severity, const char* message, T&&... args) {
+void evoLog(PrintSeverity severity, const char* message, T&&... args) {
     fmt::color severity_color = fmt::color::mint_cream;
     const char* severity_text = "NONE!";
 

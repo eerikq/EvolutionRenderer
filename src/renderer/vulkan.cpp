@@ -1,131 +1,17 @@
 /*
-#include <array>
-#include <cstdint>
-#include <cstdlib>
-#include <filesystem>
-#include <fstream>
-#include <stdexcept>
-#include <volk.h>
 
 uint32_t frame_index = 0;
 
-vk::SurfaceFormatKHR choose_swap_surface_format(std::vector<vk::SurfaceFormatKHR> const& availableFormats) {
-    const auto formatIt = std::ranges::find_if(availableFormats, [](const auto& format) {
-        return format.format == vk::Format::eB8G8R8A8Srgb && format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-    });
-
-    return formatIt != availableFormats.end() ? *formatIt : availableFormats[0];
-}
-
-vk::PresentModeKHR chooseSwapPresentMode(std::vector<vk::PresentModeKHR> const& availablePresentModes) {
-    assert(std::ranges::any_of(availablePresentModes, [](auto presentMode) {
-        return presentMode == vk::PresentModeKHR::eFifo;
-    }));
-
-    return std::ranges::any_of(
-               availablePresentModes,
-               [](const vk::PresentModeKHR value) {
-                   return vk::PresentModeKHR::eMailbox == value;
-               }
-           )
-               ? vk::PresentModeKHR::eMailbox
-               : vk::PresentModeKHR::eFifo;
-}
-
-vk::Extent2D chooseSwapExtent(vk::SurfaceCapabilitiesKHR const& capabilities) {
-    if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) return capabilities.currentExtent;
-
-    int width, height;
-    SDL_GetWindowSizeInPixels(window, &width, &height);
-
-    return {
-        std::clamp<uint32_t>(width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width),
-        std::clamp<uint32_t>(height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height)
-    };
-}
-
-static uint32_t chooseSwapMinImageCount(vk::SurfaceCapabilitiesKHR const& surfaceCapabilities) {
-    auto minImageCount = std::max(3u, surfaceCapabilities.minImageCount);
-    if ((0 < surfaceCapabilities.maxImageCount) && (surfaceCapabilities.maxImageCount < minImageCount)) {
-        minImageCount = surfaceCapabilities.maxImageCount;
-    }
-
-    return minImageCount;
-}
-
-void create_swap_chain() {
-    vk::SurfaceCapabilitiesKHR surfaceCapabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-    swap_chain_extent = chooseSwapExtent(surfaceCapabilities);
-    uint32_t minImageCount = chooseSwapMinImageCount(surfaceCapabilities);
-
-    std::vector<vk::SurfaceFormatKHR> availableFormats = physical_device.getSurfaceFormatsKHR(*surface);
-    swap_chain_surface_format = choose_swap_surface_format(availableFormats);
-
-    std::vector<vk::PresentModeKHR> availablePresentModes = physical_device.getSurfacePresentModesKHR(*surface);
-    vk::PresentModeKHR presentMode = chooseSwapPresentMode(availablePresentModes);
-
-    vk::SwapchainCreateInfoKHR swapChainCreateInfo{
-        .surface = *surface,
-        .minImageCount = minImageCount,
-        .imageFormat = swap_chain_surface_format.format,
-        .imageColorSpace = swap_chain_surface_format.colorSpace,
-        .imageExtent = swap_chain_extent,
-        .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .imageSharingMode = vk::SharingMode::eExclusive,
-        .preTransform = surfaceCapabilities.currentTransform,
-        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = presentMode,
-        .clipped = true
-    };
-
-    swap_chain = vk::raii::SwapchainKHR(device, swapChainCreateInfo);
-    swap_chain_images = swap_chain.getImages();
-}
-
-void create_image_views() {
-    assert(swap_chain_image_views.empty());
-
-    vk::ImageViewCreateInfo imageViewCreateInfo{
-        .viewType = vk::ImageViewType::e2D,
-        .format = swap_chain_surface_format.format,
-        .subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1}
-    };
-
-    imageViewCreateInfo.components = {
-        vk::ComponentSwizzle::eIdentity,
-        vk::ComponentSwizzle::eIdentity,
-        vk::ComponentSwizzle::eIdentity,
-        vk::ComponentSwizzle::eIdentity,
-    };
-
-    imageViewCreateInfo.subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1};
-
-    for (auto& image : swap_chain_images) {
-        imageViewCreateInfo.image = image;
-        swap_chain_image_views.emplace_back(device, imageViewCreateInfo);
-    }
-}
-
-static std::vector<char> readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-    if (!file.is_open()) {
-        std::cerr << "Current working directory: " << std::filesystem::current_path() << std::endl;
-        throw std::runtime_error("failed to open file!");
-    }
-
-    std::vector<char> buffer(file.tellg());
-    file.seekg(0, std::ios::beg);
-    file.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
-    file.close();
-
-    return buffer;
-}
-
 [[nodiscard]] vk::raii::ShaderModule createShaderModule(const std::vector<char>& code) const {
-    vk::ShaderModuleCreateInfo createInfo{.codeSize = code.size() * sizeof(char), .pCode = reinterpret_cast<const uint32_t*>(code.data())};
+    vk::ShaderModuleCreateInfo createInfo {
+        .codeSize = code.size() * sizeof(char), .
+        pCode = reinterpret_cast<const uint32_t*>(code.data())
+    };
 
-    vk::raii::ShaderModule shaderModule{device, createInfo};
+    vk::raii::ShaderModule shaderModule {
+        device,
+        createInfo
+    };
 
     return shaderModule;
 }

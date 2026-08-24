@@ -1,10 +1,17 @@
-#include "device_context.h"
-#include "platform/window.h"
-#include "renderer/device.h"
-#include "renderer/vulkan_instance.h"
-#include "types/vertex.h"
+// fundemental
 #include "util/log.h"
+// application
+#include "platform/window.h"
+// graphics
+#include "renderer/device.h"
+#include "renderer/swapchain.h"
+#include "renderer/vulkan_instance.h"
+// contexts
+#include "device_context.h"
+#include "rendering_context.h"
 #include "vulkan_context.h"
+// misc.
+#include "types/vertex.h"
 
 #include <glm/glm.hpp>
 
@@ -23,6 +30,7 @@ const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
 VulkanContext vulkan_context;
 DeviceContext device_context;
+RenderingContext rendering_context;
 
 class Renderer {
   public:
@@ -34,14 +42,6 @@ class Renderer {
     }
 
   private:
-    // swap chain
-    VkSwapchainKHR swap_chain = nullptr;
-    std::vector<VkImage> swap_chain_images;
-    VkSurfaceFormatKHR swap_chain_surface_format;
-    VkExtent2D swap_chain_extent;
-    std::vector<VkImageView> swap_chain_image_views;
-    // swap chain
-
     // pipeline
     VkPipelineLayout pipeline_layout = nullptr;
     VkPipeline graphics_pipeline = nullptr;
@@ -73,25 +73,35 @@ class Renderer {
         vulkanCreateDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
 
         // windowing
-        windowCreateSurface(vulkan_context.instance, &vulkan_context.surface);
+        windowCreateSurface(vulkan_context.instance, &rendering_context.surface);
 
         // device
         devicePickPhysicalDevice(vulkan_context.instance, &device_context.physical_device);
-        deviceCreateLogicalDevice(device_context.physical_device, vulkan_context.surface, &device_context.graphics_queue_index, &device_context.logical_device);
+        deviceCreateLogicalDevice(
+            device_context.physical_device, rendering_context.surface, &device_context.graphics_queue_index, &device_context.logical_device
+        );
         volkLoadDevice(device_context.logical_device);
         deviceGetQueue(device_context.logical_device, device_context.graphics_queue_index, &device_context.graphics_queue);
 
+        // swap chain
+        swapchainCreate(device_context.physical_device, device_context.logical_device, rendering_context.surface, &rendering_context.swapchain);
+
+        uint32_t swapchain_images_count = 0;
+        swapchainGetImages(device_context.logical_device, rendering_context.swapchain, nullptr, &swapchain_images_count);
+        rendering_context.swapchain_images.resize(swapchain_images_count);
+        swapchainGetImages(device_context.logical_device, rendering_context.swapchain, rendering_context.swapchain_images.data(), &swapchain_images_count);
+
+        rendering_context.swapchain_image_views.resize(swapchain_images_count);
+        swapchainCreateImageViews(
+            device_context.logical_device, rendering_context.swapchain_surface_format.format, rendering_context.swapchain_images.data(),
+            rendering_context.swapchain_images.size(), rendering_context.swapchain_image_views.data()
+        );
+
         /*
-            // swap chain
-            create_swap_chain();
-            SDL_Log("created swap chain");
-            create_image_views();
-            SDL_Log("created image views");
             create_graphics_pipeline();
             SDL_Log("created graphics pipeline");
             create_command_pool();
             SDL_Log("created command pool");
-            // swap chain
 
             // buffers
             create_vertex_buffer();
@@ -126,7 +136,7 @@ class Renderer {
     }
 
     void cleanup() {
-        windowDestroySurface(vulkan_context.instance, &vulkan_context.surface);
+        windowDestroySurface(vulkan_context.instance, &rendering_context.surface);
         vulkanDestroyDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
         vulkanDestroyInstance(&vulkan_context.instance);
 
@@ -139,7 +149,7 @@ int main() {
         Renderer program;
         program.run();
     } catch (const std::exception& e) {
-        debugLog(PrintSeverity::Fatal, "{}", e.what());
+        evoLog(PrintSeverity::Fatal, "{}", e.what());
         return EXIT_FAILURE;
     }
 

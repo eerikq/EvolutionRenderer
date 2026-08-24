@@ -33,7 +33,7 @@ static bool validateInstanceLayers(const uint32_t layers_count, const char* cons
         }
 
         if (!found_layer) {
-            debugLog(PrintSeverity::Error, "Required layer not supported: {}", layers_names[i]);
+            evoLog(PrintSeverity::Error, "Required layer not supported: {}", layers_names[i]);
             return false;
         }
     }
@@ -57,7 +57,7 @@ static bool validateInstanceExtensions(const uint32_t extensions_count, const ch
         }
 
         if (!found_extension) {
-            debugLog(PrintSeverity::Error, "Required extension not supported: {}", extensions_names[i]);
+            evoLog(PrintSeverity::Error, "Required extension not supported: {}", extensions_names[i]);
             return false;
         }
     }
@@ -100,7 +100,7 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
         .ppEnabledExtensionNames = extensions.data(),
     };
 
-    debugLog(PrintSeverity::Info, "Created Vulkan instance. Validation layers: {}", enable_validation_layers ? "Enabled" : "Disabled");
+    evoLog(PrintSeverity::Info, "Created Vulkan instance. Validation layers: {}", enable_validation_layers ? "Enabled" : "Disabled");
     return vkCreateInstance(&create_info, nullptr, instance);
 }
 
@@ -109,16 +109,18 @@ void vulkanDestroyInstance(VkInstance* instance) {
 }
 
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT severity, VkDebugUtilsMessageTypeFlagsEXT type, const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
+    VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+    VkDebugUtilsMessageTypeFlagsEXT type,
+    const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
     void* p_user_data
 ) {
-    debugLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
+    evoLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
     return VK_FALSE;
 }
 
 VkResult vulkanCreateDebugMessenger(const VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
     if (!enable_validation_layers) {
-        debugLog(PrintSeverity::Warn, "Validation layers are disabled! Debug messenger will not be created");
+        evoLog(PrintSeverity::Warn, "Validation layers are disabled! Debug messenger will not be created");
         return VK_SUCCESS;
     }
 
@@ -132,7 +134,7 @@ VkResult vulkanCreateDebugMessenger(const VkInstance instance, VkDebugUtilsMesse
         .pfnUserCallback = &debugCallback,
     };
 
-    debugLog(PrintSeverity::Info, "Created debug messenger");
+    evoLog(PrintSeverity::Info, "Created debug messenger");
     return vkCreateDebugUtilsMessengerEXT(instance, &create_info, nullptr, debug_messenger);
 }
 
