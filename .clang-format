@@ -1,15 +1,81 @@
+# ------ # Naming Convention # ------ #
+# snake_case:                         #
+# - file names                        #
+# - folder names                      #
+# - local variables                   #
+# - class variables                   #
+# - struct variables                  #
+# - function parameters               #
+# ----------------------------------- #
+# PascalCase:                         #
+# - Enums                             #
+# - Classes                           #
+# - Structs                           #
+# - Typedefs                          #
+# ----------------------------------- #
+# camelCase:                          #
+# - functions                         #
+# ----------------------------------- #
 ---
+Language: Cpp
+Standard: c++20
 BasedOnStyle: LLVM
-ColumnLimit: 0
+
+# Layout
+ColumnLimit: 160
 IndentWidth: 4
-AllowAllParametersOfDeclarationOnNextLine: false
-BinPackParameters: true
-AlignAfterOpenBracket: DontAlign
+PenaltyBreakAssignment: 2048
+UseTab: Never
+
+# Short Blocks
+AllowShortBlocksOnASingleLine: Never
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: None
+AllowShortCaseLabelsOnASingleLine: true
+
+# Braces Formatting
 BreakBeforeBraces: Custom
 BraceWrapping:
-  AfterFunction: false
+  AfterClass: false
   AfterControlStatement: Never
-  BeforeElse: true
-AllowShortIfStatementsOnASingleLine: Never
+  AfterEnum: false
+  AfterFunction: false
+  AfterNamespace: false
+  AfterStruct: false
+  BeforeElse: false
+  BeforeWhile: false
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+
+# Alignment
 PointerAlignment: Left
-Cpp11BracedListStyle: false
+DerivePointerAlignment: false
+AlignAfterOpenBracket: BlockIndent
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+
+# Includes
+SortIncludes: true
+IncludeBlocks: Regroup
+
+# Misc
+AllowAllParametersOfDeclarationOnNextLine: false
+Cpp11BracedListStyle: true
+SpaceBeforeCpp11BracedList: true
+BinPackParameters: false
+AlwaysBreakTemplateDeclarations: Yes
+IndentCaseLabels: true
+NamespaceIndentation: All
+AlignOperands: Align
+BreakBeforeBinaryOperators: None
+AlwaysBreakAfterReturnType: None
+PenaltyReturnTypeOnItsOwnLine: 1000

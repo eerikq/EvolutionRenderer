@@ -20,7 +20,7 @@
       "-fvk-use-entrypoint-name",
       "-entry", "vertMain",
       "-entry", "fragMain",
-      "-o", "shaders/slang.spv"
+      "-o", "shaders/compiled/slang.spv"
     ]
   },
 ]
