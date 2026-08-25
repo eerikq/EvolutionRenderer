@@ -3,21 +3,26 @@
 // application
 #include "platform/window.h"
 // graphics
+#include "renderer/command.h"
 #include "renderer/device.h"
+#include "renderer/draw.h"
+#include "renderer/pipeline.h"
 #include "renderer/swapchain.h"
+#include "renderer/sync.h"
 #include "renderer/vulkan_instance.h"
 // contexts
+#include "buffer_context.h"
 #include "device_context.h"
 #include "rendering_context.h"
 #include "vulkan_context.h"
 // misc.
 #include "types/vertex.h"
 
+#include <SDL3/SDL_events.h>
 #include <glm/glm.hpp>
 
 constexpr int window_width = 1200;
 constexpr int window_height = 900;
-constexpr int max_frames_in_flights = 2;
 
 const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -28,9 +33,10 @@ const std::vector<Vertex> vertices = {
 
 const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
-VulkanContext vulkan_context;
+BufferContext buffer_context;
 DeviceContext device_context;
 RenderingContext rendering_context;
+VulkanContext vulkan_context;
 
 class Renderer {
   public:
@@ -42,37 +48,17 @@ class Renderer {
     }
 
   private:
-    // pipeline
-    VkPipelineLayout pipeline_layout = nullptr;
-    VkPipeline graphics_pipeline = nullptr;
-    VkCommandPool command_pool = nullptr;
-    std::vector<VkCommandBuffer> command_buffers;
-    // pipeline
-
-    // idk where this goes
-    std::vector<VkSemaphore> present_complete_semaphores;
-    std::vector<VkSemaphore> render_finished_semaphores;
-    std::vector<VkFence> in_flight_fences;
-    // idk where this goes
-
-    // buffers
-    VkBuffer vertex_buffer = nullptr;
-    VkDeviceMemory vertex_buffer_memory = nullptr;
-    VkBuffer index_buffer = nullptr;
-    VkDeviceMemory index_buffer_memory = nullptr;
-    // buffers
-
     bool framebuffer_resized = false;
     bool is_running = true;
 
     void init_vulkan() {
-        // vulkan initialization
+        // instance
         volkInitialize(); // add a check here later to ensure VK_SUCCESS is returned
         vulkanCreateInstance(&vulkan_context.instance);
         volkLoadInstance(vulkan_context.instance);
         vulkanCreateDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
 
-        // windowing
+        // window
         windowCreateSurface(vulkan_context.instance, &rendering_context.surface);
 
         // device
@@ -83,7 +69,7 @@ class Renderer {
         volkLoadDevice(device_context.logical_device);
         deviceGetQueue(device_context.logical_device, device_context.graphics_queue_index, &device_context.graphics_queue);
 
-        // swap chain
+        // swapchain
         swapchainCreate(device_context.physical_device, device_context.logical_device, rendering_context.surface, &rendering_context.swapchain);
 
         uint32_t swapchain_images_count = 0;
@@ -97,41 +83,37 @@ class Renderer {
             rendering_context.swapchain_images.size(), rendering_context.swapchain_image_views.data()
         );
 
-        /*
-            create_graphics_pipeline();
-            SDL_Log("created graphics pipeline");
-            create_command_pool();
-            SDL_Log("created command pool");
+        pipelineCreateGraphics(
+            device_context.logical_device, rendering_context.swapchain_surface_format, &vulkan_context.graphics_pipeline, &vulkan_context.pipeline_layout
+        );
 
-            // buffers
-            create_vertex_buffer();
-            SDL_Log("created vertex buffer");
-            create_index_buffer();
-            SDL_Log("created index buffer");
-            create_command_buffers();
-            SDL_Log("created command buffer");
-            // buffers
+        // command
+        commandCreatePool(device_context.logical_device, 0, &vulkan_context.command_pool);
+        commandAllocateBuffers(device_context.logical_device, vulkan_context.command_pool, vulkan_context.command_buffers.data());
 
-            create_sync_objects();
-            SDL_Log("created sync objects");
-        */
+        // buffers
+        void bufferCreateVertex();
+        void bufferCreateIndex();
+
+        // sync
+        syncCreateObjects(
+            device_context.logical_device, static_cast<uint32_t>(rendering_context.swapchain_images.size()), &vulkan_context.in_flight_fences,
+            &vulkan_context.render_finished_semaphores, &vulkan_context.present_complete_semaphores
+        );
     }
 
     void main_loop() {
-
         while (is_running) {
-            /*
-                SDL_Event event;
-                //draw_frame();
+            SDL_Event event;
+            drawFrame();
 
-                while (SDL_PollEvent(&event)) {
-                    if (event.type == SDL_EVENT_QUIT) {
-                        is_running = false;
-                    } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
-                        framebuffer_resized = true;
-                    }
+            while (SDL_PollEvent(&event)) {
+                if (event.type == SDL_EVENT_QUIT) {
+                    is_running = false;
+                } else if (event.type == SDL_EVENT_WINDOW_RESIZED) {
+                    framebuffer_resized = true;
                 }
-            */
+            }
         }
     }
 

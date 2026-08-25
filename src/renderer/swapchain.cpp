@@ -154,3 +154,11 @@ void swapchainDestroyImageViews(const VkDevice logical_device, VkImageView* swap
         swapchain_image_views[i] = VK_NULL_HANDLE;
     }
 }
+
+void swapchainRecreate() {
+    device.waitIdle();
+
+    cleanup_swap_chain();
+    create_swap_chain();
+    create_image_views();
+}
