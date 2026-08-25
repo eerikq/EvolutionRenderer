@@ -32,6 +32,8 @@ target("evolution-renderer")
     set_kind("binary")
     add_files("src/**.cpp")
     add_includedirs("src")
+
+    add_defines("SDL_MAIN_HANDLED")
     add_cxflags("-ferror-limit=0", { tools = { "clang", "clangxx" } })
 
     if is_plat("windows") then
