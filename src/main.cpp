@@ -3,6 +3,7 @@
 // application
 #include "platform/window.h"
 // graphics
+#include "renderer/buffer.h"
 #include "renderer/command.h"
 #include "renderer/device.h"
 #include "renderer/draw.h"
@@ -18,20 +19,10 @@
 // misc.
 #include "types/vertex.h"
 
-#include <SDL3/SDL_events.h>
-#include <glm/glm.hpp>
+#include <SDL3/SDL.h>
 
 constexpr int window_width = 1200;
 constexpr int window_height = 900;
-
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-};
-
-const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
 BufferContext buffer_context;
 DeviceContext device_context;
@@ -63,14 +54,15 @@ class Renderer {
 
         // device
         devicePickPhysicalDevice(vulkan_context.instance, &device_context.physical_device);
-        deviceCreateLogicalDevice(
-            device_context.physical_device, rendering_context.surface, &device_context.graphics_queue_index, &device_context.logical_device
-        );
+        deviceCreateLogicalDevice(device_context.physical_device, rendering_context.surface, &device_context.queue_index, &device_context.logical_device);
         volkLoadDevice(device_context.logical_device);
-        deviceGetQueue(device_context.logical_device, device_context.graphics_queue_index, &device_context.graphics_queue);
+        deviceGetQueue(device_context.logical_device, device_context.queue_index, &device_context.graphics_queue);
 
         // swapchain
-        swapchainCreate(device_context.physical_device, device_context.logical_device, rendering_context.surface, &rendering_context.swapchain);
+        swapchainCreate(
+            device_context.physical_device, device_context.logical_device, rendering_context.surface, &rendering_context.swapchain,
+            &rendering_context.swapchain_extent, &rendering_context.swapchain_surface_format
+        );
 
         uint32_t swapchain_images_count = 0;
         swapchainGetImages(device_context.logical_device, rendering_context.swapchain, nullptr, &swapchain_images_count);
@@ -87,13 +79,20 @@ class Renderer {
             device_context.logical_device, rendering_context.swapchain_surface_format, &vulkan_context.graphics_pipeline, &vulkan_context.pipeline_layout
         );
 
+        vulkan_context.command_buffers.resize(swapchain_images_count);
         // command
-        commandCreatePool(device_context.logical_device, 0, &vulkan_context.command_pool);
+        commandCreatePool(device_context.logical_device, device_context.queue_index, &vulkan_context.command_pool);
         commandAllocateBuffers(device_context.logical_device, vulkan_context.command_pool, vulkan_context.command_buffers.data());
 
         // buffers
-        void bufferCreateVertex();
-        void bufferCreateIndex();
+        bufferCreateVertex(
+            device_context.graphics_queue, vulkan_context.command_pool, device_context.physical_device, device_context.logical_device,
+            &buffer_context.vertex_buffer, &buffer_context.vertex_buffer_memory
+        );
+        bufferCreateIndex(
+            device_context.graphics_queue, vulkan_context.command_pool, device_context.physical_device, device_context.logical_device,
+            &buffer_context.index_buffer, &buffer_context.index_buffer_memory
+        );
 
         // sync
         syncCreateObjects(
@@ -105,7 +104,16 @@ class Renderer {
     void main_loop() {
         while (is_running) {
             SDL_Event event;
-            drawFrame();
+
+            drawFrame(
+                &vulkan_context.frame_index, device_context.logical_device, vulkan_context.in_flight_fences.data(),
+                static_cast<uint32_t>(vulkan_context.in_flight_fences.size()), vulkan_context.present_complete_semaphores.data(),
+                vulkan_context.render_finished_semaphores.data(), rendering_context.swapchain, device_context.graphics_queue,
+                vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(),
+                vulkan_context.graphics_pipeline, rendering_context.swapchain_extent, &buffer_context.vertex_buffer, &buffer_context.index_buffer
+            );
+
+            evoLog(PrintSeverity::Debug, "drew frame");
 
             while (SDL_PollEvent(&event)) {
                 if (event.type == SDL_EVENT_QUIT) {

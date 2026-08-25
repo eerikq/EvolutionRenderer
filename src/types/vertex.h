@@ -1,5 +1,5 @@
 #include <glm/glm.hpp>
-#include <vulkan/vulkan_core.h>
+#include <volk.h>
 
 typedef struct Vertex {
     glm::vec2 pos;
@@ -7,7 +7,7 @@ typedef struct Vertex {
 } Vertex;
 
 typedef struct VertexDescription {
-    constexpr static VkVertexInputBindingDescription bindingDescription = {
+    static constexpr VkVertexInputBindingDescription binding_description = {
         .binding = 0,
         .stride = sizeof(Vertex),
         .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
@@ -20,18 +20,18 @@ typedef struct VertexDescription {
     // 4. has a lightweight
     // 5. dont suffer from pointer decay (i.e. type and array dimension isn't lost)
     // 6. can be directly handed to C APIs via .data()
-    constexpr static std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {
-        {{
-             .location = 0,
-             .binding = 0,
-             .format = VK_FORMAT_R32G32_SFLOAT,
-             .offset = offsetof(Vertex, pos),
-         },
-         {
-             .location = 1,
-             .binding = 0,
-             .format = VK_FORMAT_R32G32B32_SFLOAT,
-             .offset = offsetof(Vertex, color),
-         }}
+    static constexpr VkVertexInputAttributeDescription attribute_descriptions[2] = {
+        {
+            .location = 0,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(Vertex, pos),
+        },
+        {
+            .location = 1,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset = offsetof(Vertex, color),
+        }
     };
 } VertexDescription;

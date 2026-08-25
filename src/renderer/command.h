@@ -12,3 +12,15 @@ void commandFreeBuffers(
     VkCommandBuffer* command_buffers,
     const uint32_t command_buffers_count
 );
+
+void commandRecordBuffer(
+    const uint32_t frame_index,
+    const uint32_t image_index,
+    const VkCommandBuffer* command_buffers,
+    const VkImage* swapchain_images,
+    const VkImageView* swapchain_image_views,
+    const VkPipeline graphics_pipeline,
+    const VkExtent2D swapchain_extent,
+    const VkBuffer* vertex_buffer,
+    const VkBuffer* index_buffer
+);

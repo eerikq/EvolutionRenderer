@@ -26,15 +26,14 @@ static uint32_t chooseSwapMinImageCount(const VkSurfaceCapabilitiesKHR surfaceCa
     return minImageCount;
 }
 
-static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const VkSurfaceFormat2KHR* available_formats, const uint32_t available_formats_count) {
+static VkSurfaceFormatKHR chooseSwapSurfaceFormat(const VkSurfaceFormatKHR* available_formats, const uint32_t available_formats_count) {
     for (uint32_t i = 0; i < available_formats_count; i++) {
-        if (available_formats[i].surfaceFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-            available_formats[i].surfaceFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-            return available_formats[i].surfaceFormat;
+        if (available_formats[i].format == VK_FORMAT_B8G8R8A8_SRGB && available_formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+            return available_formats[i];
         }
     }
 
-    return available_formats[0].surfaceFormat;
+    return available_formats[0];
 }
 
 static VkPresentModeKHR chooseSwapPresentMode(const VkPresentModeKHR* available_present_modes, const uint32_t available_present_modes_count) {
@@ -47,28 +46,28 @@ static VkPresentModeKHR chooseSwapPresentMode(const VkPresentModeKHR* available_
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkResult swapchainCreate(const VkPhysicalDevice physical_device, const VkDevice logical_device, const VkSurfaceKHR surface, VkSwapchainKHR* swapchain) {
+VkResult swapchainCreate(
+    const VkPhysicalDevice physical_device,
+    const VkDevice logical_device,
+    const VkSurfaceKHR surface,
+    VkSwapchainKHR* swapchain,
+    VkExtent2D* swapchain_extent,
+    VkSurfaceFormatKHR* swapchain_surface_format
+) {
     // swapchain min image count & extent
     VkSurfaceCapabilitiesKHR surface_capabilities {};
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &surface_capabilities);
 
     uint32_t min_image_count = chooseSwapMinImageCount(surface_capabilities);
-    VkExtent2D swapchain_extent = chooseSwapExtent(surface_capabilities);
+    *swapchain_extent = chooseSwapExtent(surface_capabilities);
 
     // swapchain surface format
     uint32_t surface_formats_count = 0;
-    VkPhysicalDeviceSurfaceInfo2KHR surface_info {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SURFACE_INFO_2_KHR,
-        .surface = surface,
-    };
-    vkGetPhysicalDeviceSurfaceFormats2KHR(physical_device, &surface_info, &surface_formats_count, nullptr);
-    std::vector<VkSurfaceFormat2KHR> surface_formats(surface_formats_count);
-    for (uint32_t i = 0; i < surface_formats_count; i++) {
-        surface_formats[i].sType = VK_STRUCTURE_TYPE_SURFACE_FORMAT_2_KHR;
-    }
-    vkGetPhysicalDeviceSurfaceFormats2KHR(physical_device, &surface_info, &surface_formats_count, surface_formats.data());
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &surface_formats_count, nullptr);
+    std::vector<VkSurfaceFormatKHR> surface_formats(surface_formats_count);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &surface_formats_count, surface_formats.data());
 
-    VkSurfaceFormatKHR swapchain_surface_format = chooseSwapSurfaceFormat(surface_formats.data(), surface_formats.size());
+    *swapchain_surface_format = chooseSwapSurfaceFormat(surface_formats.data(), surface_formats.size());
 
     // swapchain present mode
     uint32_t present_modes_count = 0;
@@ -82,9 +81,9 @@ VkResult swapchainCreate(const VkPhysicalDevice physical_device, const VkDevice 
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
         .surface = surface,
         .minImageCount = min_image_count,
-        .imageFormat = swapchain_surface_format.format,
-        .imageColorSpace = swapchain_surface_format.colorSpace,
-        .imageExtent = swapchain_extent,
+        .imageFormat = swapchain_surface_format->format,
+        .imageColorSpace = swapchain_surface_format->colorSpace,
+        .imageExtent = *swapchain_extent,
         .imageArrayLayers = 1,
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -155,6 +154,7 @@ void swapchainDestroyImageViews(const VkDevice logical_device, VkImageView* swap
     }
 }
 
+/*
 void swapchainRecreate() {
     device.waitIdle();
 
@@ -162,3 +162,4 @@ void swapchainRecreate() {
     create_swap_chain();
     create_image_views();
 }
+*/

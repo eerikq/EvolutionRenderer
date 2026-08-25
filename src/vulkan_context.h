@@ -17,4 +17,7 @@ typedef struct VulkanContext {
     std::vector<VkSemaphore> present_complete_semaphores;
     std::vector<VkSemaphore> render_finished_semaphores;
     std::vector<VkFence> in_flight_fences;
+
+    uint32_t frame_index = 0;
+    const uint32_t max_frames_in_flights = 2;
 } VulkanContext;

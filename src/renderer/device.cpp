@@ -11,16 +11,26 @@ constexpr std::array<const char*, 1> required_device_extensions = {
 };
 
 static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* device_name) {
-    VkPhysicalDeviceProperties2 device_properties {};
+    VkPhysicalDeviceProperties2 device_properties {
+        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2,
+    };
     vkGetPhysicalDeviceProperties2(physical_device, &device_properties);
 
+    evoLog(PrintSeverity::Debug, "Evaluating {} for suitability", device_properties.properties.deviceName);
+
     // check if device supports vulkan 1.4
-    if (device_properties.properties.apiVersion < VK_API_VERSION_1_4) return false;
+    if (device_properties.properties.apiVersion < VK_API_VERSION_1_4) {
+        evoLog(PrintSeverity::Error, "{} doesn't support Vulkan 1.4", device_properties.properties.deviceName);
+        return false;
+    }
 
     // check if any of the queue families support graphics operations
     uint32_t queue_property_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &queue_property_count, nullptr);
     std::vector<VkQueueFamilyProperties2> queue_properties(queue_property_count);
+    for (uint32_t i = 0; i < queue_property_count; i++) {
+        queue_properties[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+    }
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &queue_property_count, queue_properties.data());
 
     bool supports_graphics = false;
@@ -31,6 +41,7 @@ static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* devic
         }
     }
     if (!supports_graphics) {
+        evoLog(PrintSeverity::Error, "{} doesn't support graphics operations", device_properties.properties.deviceName);
         return false;
     }
 
@@ -49,7 +60,9 @@ static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* devic
         }
 
         if (!found_extension) {
-            evoLog(PrintSeverity::Warn, "Required extension not supported: {}", required_device_extensions[i]);
+            evoLog(
+                PrintSeverity::Warn, "{} doesn't support the required extension: {}", device_properties.properties.deviceName, required_device_extensions[i]
+            );
             return false;
         }
     }
@@ -76,10 +89,12 @@ static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* devic
     bool supports_required_features = features_vulkan_11.shaderDrawParameters && features_vulkan_13.dynamicRendering && features_vulkan_13.synchronization2 &&
                                       features_dynamic_state.extendedDynamicState;
 
-    if (!supports_required_features) return false;
+    if (!supports_required_features) {
+        evoLog(PrintSeverity::Error, "{} doesn't support required features", device_properties.properties.deviceName);
+        return false;
+    }
 
-    // copy the deviceName into device_name to make sure the name is printable
-    // even after deviceName goes out of scope
+    // copy the deviceName into device_name to make sure the name is printable, even after deviceName goes out of scope
     strncpy(device_name, device_properties.properties.deviceName, VK_MAX_PHYSICAL_DEVICE_NAME_SIZE);
 
     return true;
@@ -88,6 +103,7 @@ static bool isDeviceSuitable(const VkPhysicalDevice physical_device, char* devic
 bool devicePickPhysicalDevice(const VkInstance instance, VkPhysicalDevice* physical_device) {
     uint32_t physical_device_count = 0;
     vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr);
+    evoLog(PrintSeverity::Debug, "Found {} physical devices", physical_device_count);
     std::vector<VkPhysicalDevice> physical_devices(physical_device_count);
     vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.data());
 
@@ -113,10 +129,12 @@ VkResult deviceCreateLogicalDevice(
     uint32_t queue_property_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &queue_property_count, nullptr);
     std::vector<VkQueueFamilyProperties2> queue_properties(queue_property_count);
+    for (uint32_t i = 0; i < queue_property_count; i++) {
+        queue_properties[i].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+    }
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device, &queue_property_count, queue_properties.data());
 
-    // get the first index into queueFamilyProperties which supports both graphics
-    // and present
+    // get the first index into queueFamilyProperties which supports both graphics and present
     for (uint32_t i = 0; i < queue_property_count; i++) {
         VkBool32 supports_surface = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &supports_surface);

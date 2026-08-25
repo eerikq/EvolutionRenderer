@@ -7,5 +7,5 @@ typedef struct DeviceContext {
     VkDevice logical_device = VK_NULL_HANDLE;
     VkQueue graphics_queue = VK_NULL_HANDLE;
 
-    uint32_t graphics_queue_index = VK_QUEUE_FAMILY_IGNORED;
+    uint32_t queue_index = VK_QUEUE_FAMILY_IGNORED;
 } DeviceContext;

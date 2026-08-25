@@ -1,5 +1,6 @@
 #include "pipeline.h"
 
+#include "types/vertex.h"
 #include "util/file.h"
 
 #include <array>
@@ -42,12 +43,14 @@ VkResult pipelineCreateGraphics(
         frag_shader_stage_create_info,
     };
 
+    VkVertexInputBindingDescription binding = VertexDescription::binding_description;
+
     VkPipelineVertexInputStateCreateInfo vertex_input_info {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
-        .vertexBindingDescriptionCount = 0,
-        .pVertexBindingDescriptions = nullptr,
-        .vertexAttributeDescriptionCount = 0,
-        .pVertexAttributeDescriptions = nullptr,
+        .vertexBindingDescriptionCount = 1,
+        .pVertexBindingDescriptions = &VertexDescription::binding_description,
+        .vertexAttributeDescriptionCount = 2,
+        .pVertexAttributeDescriptions = VertexDescription::attribute_descriptions,
     };
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly {
@@ -95,11 +98,13 @@ VkResult pipelineCreateGraphics(
         VK_DYNAMIC_STATE_SCISSOR,
     };
     VkPipelineDynamicStateCreateInfo dynamic_state {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,
         .dynamicStateCount = static_cast<uint32_t>(dynamic_states.size()),
         .pDynamicStates = dynamic_states.data(),
     };
 
     VkPipelineLayoutCreateInfo pipeline_layout_create_info {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
         .setLayoutCount = 0,
         .pushConstantRangeCount = 0,
     };
@@ -107,11 +112,12 @@ VkResult pipelineCreateGraphics(
     vkCreatePipelineLayout(logical_device, &pipeline_layout_create_info, nullptr, pipeline_layout);
 
     VkPipelineRenderingCreateInfo rendering_create_info {
-        .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
         .colorAttachmentCount = 1,
         .pColorAttachmentFormats = &swapchain_surface_format.format,
     };
     VkGraphicsPipelineCreateInfo pipeline_create_info {
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .pNext = &rendering_create_info,
         .stageCount = 2,
         .pStages = shader_stages,

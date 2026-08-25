@@ -2,7 +2,14 @@
 
 #include <volk.h>
 
-VkResult swapchainCreate(const VkPhysicalDevice physical_device, const VkDevice logical_device, const VkSurfaceKHR surface, VkSwapchainKHR* swapchain);
+VkResult swapchainCreate(
+    const VkPhysicalDevice physical_device,
+    const VkDevice logical_device,
+    const VkSurfaceKHR surface,
+    VkSwapchainKHR* swapchain,
+    VkExtent2D* swapchain_extent,
+    VkSurfaceFormatKHR* swapchain_surface_format
+);
 void swapchainDestroy(const VkDevice logical_device, VkSwapchainKHR* swapchain, VkImageView* swapchain_image_views, const uint32_t swapchain_image_views_count);
 void swapchainGetImages(const VkDevice logical_device, const VkSwapchainKHR swapchain, VkImage* swapchain_images, uint32_t* swapchain_images_count);
 

@@ -114,7 +114,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
     void* p_user_data
 ) {
-    evoLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
+    evoLog(PrintSeverity::VkWarn, "[{}] {}", type, p_callback_data->pMessage);
     return VK_FALSE;
 }
 
