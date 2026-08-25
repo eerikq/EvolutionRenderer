@@ -13,6 +13,9 @@ add_requires("vulkan-memory-allocator 3.3.0")
 add_requires("volk 1.4.335+0")
 
 -- other libraries
+if is_plat("windows") then
+    add_requires("vulkansdk")
+end
 add_requires("glm 1.0.3")
 add_requires("fmt 12.2.0")
 add_requires("libsdl3 3.4.12")
@@ -31,6 +34,9 @@ target("evolution-renderer")
     add_includedirs("src")
     add_cxflags("-ferror-limit=0", { tools = { "clang", "clangxx" } })
 
+    if is_plat("windows") then
+        add_packages("vulkansdk")
+    end
     add_packages("vulkan-headers")
     add_packages("vulkan-loader")
     add_packages("vulkan-memory-allocator")
