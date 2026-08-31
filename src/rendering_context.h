@@ -12,4 +12,8 @@ typedef struct RenderingContext {
 
     std::vector<VkImage> swapchain_images {VK_NULL_HANDLE};
     std::vector<VkImageView> swapchain_image_views {VK_NULL_HANDLE};
+
+    std::vector<VkSemaphore> present_complete_semaphores {VK_NULL_HANDLE};
+    std::vector<VkSemaphore> render_finished_semaphores {VK_NULL_HANDLE};
+    std::vector<VkFence> in_flight_fences {VK_NULL_HANDLE};
 } RenderingContext;

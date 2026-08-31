@@ -2,29 +2,70 @@
 
 #include "types/vertex.h"
 
-#include <cstring>
-#include <vector>
+VkResult bufferCreate(
+    const VkDeviceSize size,
+    const VkBufferUsageFlags buffer_flags,
+    const VmaAllocationCreateFlags allocation_flags,
+    const VmaAllocator allocator,
+    Buffer* buffer
+) {
+    VkBufferCreateInfo buffer_info {
+        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+        .size = size,
+        .usage = buffer_flags,
+        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+    };
+    VmaAllocationCreateInfo allocation_info = {
+        .flags = allocation_flags,
+        .usage = VMA_MEMORY_USAGE_AUTO,
+    };
 
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-};
+    return vmaCreateBuffer(allocator, &buffer_info, &allocation_info, &buffer->data, &buffer->allocation, nullptr);
+}
 
-const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+void bufferDestroy(const VmaAllocator allocator, Buffer* buffer) {
+    vmaDestroyBuffer(allocator, buffer->data, buffer->allocation);
+}
 
-static uint32_t findMemoryType(const VkPhysicalDevice physical_device, const uint32_t type_filter, VkMemoryPropertyFlags properties) {
-    VkPhysicalDeviceMemoryProperties memory_properties {};
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+VkResult bufferCopy(
+    const VkQueue graphics_queue,
+    const VkCommandPool command_pool,
+    const VkDevice logical_device,
+    const Buffer source,
+    const Buffer destination,
+    const VkDeviceSize size
+) {
+    VkCommandBufferAllocateInfo command_buffer_create_info {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = command_pool,
+        .level = VkCommandBufferLevel::VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
 
-    for (uint32_t i = 0; i < memory_properties.memoryTypeCount; i++) {
-        if ((type_filter & (1 << i)) && (memory_properties.memoryTypes[i].propertyFlags & properties) == properties) {
-            return i;
-        }
-    }
+    VkCommandBuffer temp_command_buffer;
+    vkAllocateCommandBuffers(logical_device, &command_buffer_create_info, &temp_command_buffer);
 
-    throw "failed to find suitable memory type!";
+    VkCommandBufferBeginInfo command_buffer_behin_info {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VkCommandBufferUsageFlagBits::VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+    };
+
+    vkBeginCommandBuffer(temp_command_buffer, &command_buffer_behin_info);
+
+    VkBufferCopy copy = VkBufferCopy(0, 0, size);
+    vkCmdCopyBuffer(temp_command_buffer, source.data, destination.data, 1, &copy);
+
+    vkEndCommandBuffer(temp_command_buffer);
+
+    VkSubmitInfo submit_info {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &temp_command_buffer,
+    };
+    vkQueueSubmit(graphics_queue, 1, &submit_info, nullptr);
+
+    vkFreeCommandBuffers(logical_device, command_pool, 1, &temp_command_buffer);
+    return VkResult::VK_SUCCESS;
 }
 
 static void copyBuffer(
@@ -41,7 +82,6 @@ static void copyBuffer(
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = 1,
     };
-
     VkCommandBuffer command_buffer_copy;
     vkAllocateCommandBuffers(logical_device, &alloc_info, &command_buffer_copy);
 
@@ -64,49 +104,34 @@ static void copyBuffer(
     vkQueueSubmit(graphics_queue, 1, &queue_subtmit_info, nullptr);
 }
 
-static std::pair<VkBuffer, VkDeviceMemory> createBuffer(
-    const VkPhysicalDevice physical_device,
-    const VkDevice logical_device,
-    const VkDeviceSize size,
-    const VkBufferUsageFlags usage,
-    const VkMemoryPropertyFlags properties
-) {
-    VkBufferCreateInfo buffer_info {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = size,
-        .usage = usage,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
+//
+//
+//
+//
+//
+// move this shit outta here later
+//
+//
+//
+//
+//
 
-    VkBuffer buffer;
-    vkCreateBuffer(logical_device, &buffer_info, nullptr, &buffer);
+const std::vector<Vertex> vertices = {
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
+};
 
-    VkMemoryRequirements memory_requirements {};
-    vkGetBufferMemoryRequirements(logical_device, buffer, &memory_requirements);
+const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 
-    VkPhysicalDeviceMemoryProperties memory_properties {};
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
-
-    VkMemoryAllocateInfo alloc_info {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .allocationSize = memory_requirements.size,
-        .memoryTypeIndex = findMemoryType(physical_device, memory_requirements.memoryTypeBits, properties),
-    };
-
-    VkDeviceMemory bufferMemory;
-    vkAllocateMemory(logical_device, &alloc_info, nullptr, &bufferMemory);
-    vkBindBufferMemory(logical_device, buffer, bufferMemory, 0);
-
-    return {std::move(buffer), std::move(bufferMemory)};
-}
-
+/*
 void bufferCreateVertex(
     const VkQueue graphics_queue,
     const VkCommandPool command_pool,
     const VkPhysicalDevice physical_device,
     const VkDevice logical_device,
-    VkBuffer* vertex_buffer,
-    VkDeviceMemory* vertex_buffer_memory
+    Buffer* vertex_buffer,
 ) {
     VkDeviceSize bufferSize = sizeof(vertices[0]) * vertices.size();
 
@@ -132,15 +157,15 @@ void bufferCreateIndex(
     const VkCommandPool command_pool,
     const VkPhysicalDevice physical_device,
     const VkDevice logical_device,
-    VkBuffer* index_buffer,
-    VkDeviceMemory* index_buffer_memory
+    Buffer* index_buffer
 ) {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
 
-    auto [stagingBuffer, stagingBufferMemory] = createBuffer(
-        physical_device, logical_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
+    bufferCreate(const VkDeviceSize size, const VkBufferUsageFlags usage, const VmaAllocator allocator, index_buffer) auto
+        [stagingBuffer, stagingBufferMemory] = createBuffer(
+            physical_device, logical_device, bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+        );
 
     void* data;
     vkMapMemory(logical_device, stagingBufferMemory, 0, bufferSize, 0, &data);
@@ -152,3 +177,4 @@ void bufferCreateIndex(
     );
     copyBuffer(graphics_queue, command_pool, logical_device, stagingBuffer, *index_buffer, bufferSize);
 }
+*/

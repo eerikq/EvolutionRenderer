@@ -1,14 +1,13 @@
 #include "draw.h"
 
+#include "engine_config.h"
 #include "renderer/command.h"
 #include "util/log.h"
 
 #include <cassert>
 
-constexpr uint32_t max_frames_in_flights = 2;
-
 void drawFrame(
-    uint32_t* frame_index,
+    int* frame_index,
     const VkDevice logical_device,
     const VkFence* in_flight_fences,
     const uint32_t in_flight_fences_count,
@@ -91,5 +90,5 @@ void drawFrame(
         default: break; // an unexpected result is returned!
     }
 
-    *frame_index = (*frame_index + 1) % max_frames_in_flights;
+    *frame_index = (*frame_index + 1) % EngineConfig::max_frames_in_flights;
 }

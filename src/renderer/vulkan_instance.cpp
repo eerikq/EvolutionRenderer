@@ -1,21 +1,11 @@
 #include "vulkan_instance.h"
 
 #include "../platform/window.h"
+#include "engine_config.h"
 #include "util/log.h"
 
-#include <array>
 #include <cstring>
 #include <vector>
-
-#ifdef NDEBUG
-constexpr bool enable_validation_layers = false;
-#else
-constexpr bool enable_validation_layers = true;
-#endif
-
-constexpr std::array<const char*, 1> required_validation_layers = {
-    "VK_LAYER_KHRONOS_validation",
-};
 
 static bool validateInstanceLayers(const uint32_t layers_count, const char* const* layers_names) {
     uint32_t layer_property_count = 0;
@@ -68,16 +58,16 @@ static bool validateInstanceExtensions(const uint32_t extensions_count, const ch
 VkResult vulkanCreateInstance(VkInstance* instance) {
     constexpr VkApplicationInfo app_info {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
-        .pApplicationName = "Evolution Renderer",
-        .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
-        .pEngineName = "No Engine",
-        .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_4,
+        .pApplicationName = EngineConfig::application_name,
+        .applicationVersion = EngineConfig::version_vulkan,
+        .pEngineName = EngineConfig::application_name,
+        .engineVersion = EngineConfig::version_vulkan,
+        .apiVersion = EngineConfig::vulkan_api_version,
     };
 
     // instance (validation) layers
-    uint32_t validation_layers_count = enable_validation_layers ? static_cast<uint32_t>(required_validation_layers.size()) : 0;
-    const char* const* validation_layers_names = enable_validation_layers ? required_validation_layers.data() : nullptr;
+    uint32_t validation_layers_count = EngineConfig::enable_validation_layers ? static_cast<uint32_t>(EngineConfig::required_validation_layers.size()) : 0;
+    const char* const* validation_layers_names = EngineConfig::enable_validation_layers ? EngineConfig::required_validation_layers.data() : nullptr;
 
     if (!validateInstanceLayers(validation_layers_count, validation_layers_names)) return VK_ERROR_LAYER_NOT_PRESENT;
 
@@ -86,7 +76,7 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
     const char* const* extension_names = windowGetInstanceExtensions(&extensions_count);
 
     std::vector extensions(extension_names, extension_names + extensions_count);
-    if (enable_validation_layers) extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    if (EngineConfig::enable_validation_layers) extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
     // append "VK_EXT_DEBUG_UTILS_EXTENSION_NAME" to the end of extensions to enable validation layers
 
     if (!validateInstanceExtensions(static_cast<uint32_t>(extensions.size()), extensions.data())) return VK_ERROR_EXTENSION_NOT_PRESENT;
@@ -100,7 +90,7 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
         .ppEnabledExtensionNames = extensions.data(),
     };
 
-    evoLog(PrintSeverity::Info, "Created Vulkan instance. Validation layers: {}", enable_validation_layers ? "Enabled" : "Disabled");
+    evoLog(PrintSeverity::Info, "Created Vulkan instance. Validation layers: {}", EngineConfig::enable_validation_layers ? "Enabled" : "Disabled");
     return vkCreateInstance(&create_info, nullptr, instance);
 }
 
@@ -114,12 +104,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
     const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
     void* p_user_data
 ) {
-    evoLog(PrintSeverity::VkWarn, "[{}] {}", type, p_callback_data->pMessage);
+    evoLog(PrintSeverity::Warn, "[{}] {}", type, p_callback_data->pMessage);
     return VK_FALSE;
 }
 
 VkResult vulkanCreateDebugMessenger(const VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
-    if (!enable_validation_layers) {
+    if (!EngineConfig::enable_validation_layers) {
         evoLog(PrintSeverity::Warn, "Validation layers are disabled! Debug messenger will not be created");
         return VK_SUCCESS;
     }

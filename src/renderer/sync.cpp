@@ -1,6 +1,6 @@
 #include "sync.h"
 
-constexpr uint32_t max_frames_in_flights = 2;
+#include "engine_config.h"
 
 void syncCreateObjects(
     const VkDevice logical_device,
@@ -22,7 +22,7 @@ void syncCreateObjects(
         render_finished_semaphores->emplace_back(semaphore);
     }
 
-    for (size_t i = 0; i < max_frames_in_flights; i++) {
+    for (size_t i = 0; i < EngineConfig::max_frames_in_flights; i++) {
         VkSemaphore semaphore;
         vkCreateSemaphore(logical_device, &semaphore_create_info, nullptr, &semaphore);
 

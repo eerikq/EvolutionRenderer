@@ -1,5 +1,6 @@
 # ------ # Naming Convention # ------ #
 # snake_case:                         #
+# - namespaces                        #
 # - file names                        #
 # - folder names                      #
 # - local variables                   #
@@ -12,9 +13,7 @@
 # - Classes                           #
 # - Structs                           #
 # - Typedefs                          #
-# ----------------------------------- #
-# camelCase:                          #
-# - functions                         #
+# - Functions                         #
 # ----------------------------------- #
 ---
 Language: Cpp

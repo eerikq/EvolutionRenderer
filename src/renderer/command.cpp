@@ -1,10 +1,9 @@
 #include "command.h"
 
+#include "engine_config.h"
 #include "types/vertex.h"
 
 #include <vector>
-
-constexpr uint32_t max_frames_in_flights = 2;
 
 const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -35,7 +34,7 @@ VkResult commandAllocateBuffers(const VkDevice logical_device, const VkCommandPo
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = command_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = max_frames_in_flights,
+        .commandBufferCount = EngineConfig::max_frames_in_flights,
     };
 
     return vkAllocateCommandBuffers(logical_device, &create_info, command_buffers);

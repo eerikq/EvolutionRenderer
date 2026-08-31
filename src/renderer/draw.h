@@ -3,7 +3,7 @@
 #include <volk.h>
 
 void drawFrame(
-    uint32_t* frame_index,
+    int* frame_index,
     const VkDevice logical_device,
     const VkFence* in_flight_fences,
     const uint32_t in_flight_fences_count,
