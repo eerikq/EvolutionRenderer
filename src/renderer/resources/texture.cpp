@@ -1,8 +1,6 @@
 #include "texture.h"
 
 #include "renderer/resources/buffer.h"
-#include "renderer/resources/vulkan_allocator.h"
-#include "util/image.h"
 #include "util/log.h"
 
 namespace texture {
@@ -132,7 +130,7 @@ namespace texture {
         Texture* texture
     ) {
         Buffer staging_buffer {};
-        bufferCreate(
+        buffer::Create(
             image->size, VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, allocator, &staging_buffer
         );
@@ -193,7 +191,7 @@ namespace texture {
         vkQueueSubmit(graphics_queue, 1, &submit_info, nullptr);
         vkQueueWaitIdle(graphics_queue);
 
-        bufferDestroy(allocator, &staging_buffer);
+        buffer::Destroy(allocator, &staging_buffer);
         vkFreeCommandBuffers(logical_device, command_pool, 1, &temp_command_buffer);
 
         return VK_SUCCESS; // simplified return, doesn't know where it failed (it also can't lol). not important right now

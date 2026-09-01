@@ -13,6 +13,8 @@
 #include "renderer/vulkan_instance.h"
 // graphics (resources)
 #include "renderer/resources/buffer.h"
+#include "renderer/resources/sampler.h"
+#include "renderer/resources/texture.h"
 #include "renderer/resources/vulkan_allocator.h"
 // contexts (engine)
 #include "engine_config.h"
@@ -23,7 +25,7 @@
 #include "rendering_context.h"
 #include "vulkan_context.h"
 // misc.
-#include "types/vertex.h"
+// #include "types/vertex.h"
 
 #include <SDL3/SDL.h>
 
@@ -91,29 +93,48 @@ class Renderer {
         commandAllocateBuffers(device_context.logical_device, vulkan_context.command_pool, vulkan_context.command_buffers.data());
 
         // buffers
-        bufferCreateVertex(
-            device_context.graphics_queue, vulkan_context.command_pool, device_context.physical_device, device_context.logical_device,
-            &buffer_context.vertex_buffer, &buffer_context.vertex_buffer_memory
+        buffer::Create(
+            sizeof(buffer_context.vertices[0]) * buffer_context.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+            vulkan_context.allocator, &buffer_context.vertex_buffer
         );
-        bufferCreateIndex(
-            device_context.graphics_queue, vulkan_context.command_pool, device_context.physical_device, device_context.logical_device,
-            &buffer_context.index_buffer, &buffer_context.index_buffer_memory
+        buffer::Write(
+            vulkan_context.allocator, device_context.graphics_queue, vulkan_context.command_pool, device_context.logical_device,
+            sizeof(buffer_context.vertices[0]) * buffer_context.vertices.size(), buffer_context.vertices.data(), &buffer_context.vertex_buffer
         );
+
+        buffer::Create(
+            sizeof(buffer_context.indices[0]) * buffer_context.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
+            vulkan_context.allocator, &buffer_context.index_buffer
+        );
+        buffer::Write(
+            vulkan_context.allocator, device_context.graphics_queue, vulkan_context.command_pool, device_context.logical_device,
+            sizeof(buffer_context.indices[0]) * buffer_context.indices.size(), buffer_context.indices.data(), &buffer_context.index_buffer
+        );
+
+        // image
+        if (!image::LoadFromFile("small.png", &buffer_context.image)) return;
+        evoLog(PrintSeverity::Debug, "Image size: {}", buffer_context.image.size);
+
+        // texture
+        texture::Create(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
+        texture::LoadImage(
+            device_context.logical_device, device_context.graphics_queue, vulkan_context.command_pool, vulkan_context.allocator, &buffer_context.image,
+            &buffer_context.texture
+        );
+
+        // sampler
+        sampler::Create(device_context.logical_device, &buffer_context.sampler);
 
         // sync
         syncCreateObjects(
-            device_context.logical_device, static_cast<uint32_t>(rendering_context.swapchain_images.size()), &rendering_context.in_flight_fences,
-            &rendering_context.render_finished_semaphores, &rendering_context.present_complete_semaphores
+            device_context.logical_device, &rendering_context.in_flight_fences, &rendering_context.render_finished_semaphores,
+            &rendering_context.present_complete_semaphores
         );
 
         engine_state.is_running = true;
     }
 
     void main_loop() {
-        Image image;
-        if (!imageLoad("small.png", &image)) return;
-        evoLog(PrintSeverity::Debug, "Size: {}", image.size);
-
         while (engine_state.is_running) {
             SDL_Event event;
 
@@ -122,7 +143,7 @@ class Renderer {
                 static_cast<uint32_t>(rendering_context.in_flight_fences.size()), rendering_context.present_complete_semaphores.data(),
                 rendering_context.render_finished_semaphores.data(), rendering_context.swapchain, device_context.graphics_queue,
                 vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(),
-                vulkan_context.graphics_pipeline, rendering_context.swapchain_extent, &buffer_context.vertex_buffer, &buffer_context.index_buffer
+                vulkan_context.graphics_pipeline, rendering_context.swapchain_extent, &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data
             );
 
             // evoLog(PrintSeverity::Debug, "drew frame");

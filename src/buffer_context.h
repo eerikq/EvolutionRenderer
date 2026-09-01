@@ -1,17 +1,26 @@
 #pragma once
 
 #include "renderer/resources/buffer.h"
+#include "renderer/resources/texture.h"
+#include "types/vertex.h"
 
+#include <vector>
 #include <volk.h>
 
 typedef struct BufferContext {
+    const std::vector<Vertex> vertices = {
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
+    };
+
+    const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+
     Buffer vertex_buffer {};
     Buffer index_buffer {};
-    /*
-    VkBuffer vertex_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory vertex_buffer_memory = VK_NULL_HANDLE;
 
-    VkBuffer index_buffer = VK_NULL_HANDLE;
-    VkDeviceMemory index_buffer_memory = VK_NULL_HANDLE;
-    */
+    Image image {};
+    Texture texture {};
+    VkSampler sampler = nullptr;
 } BufferContext;

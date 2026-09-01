@@ -1,5 +1,8 @@
 #include "vulkan_allocator.h"
 
+#define VMA_IMPLEMENTATION
+#include <vk_mem_alloc.h>
+
 VkResult vulkanAllocatorCreate(const VkInstance instance, const VkPhysicalDevice physical_device, const VkDevice logical_device, VmaAllocator* allocator) {
     VmaVulkanFunctions vulkan_functions = {
         .vkGetInstanceProcAddr = vkGetInstanceProcAddr,

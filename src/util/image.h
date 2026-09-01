@@ -12,5 +12,7 @@ typedef struct Image {
     uint8_t* data = 0;
 } Image;
 
-bool imageLoad(const char* file_path, Image* image);
-void imageFree(Image* image);
+namespace image {
+    bool LoadFromFile(const char* file_path, Image* image);
+    void Free(Image* image);
+} // namespace image
