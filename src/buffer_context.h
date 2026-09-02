@@ -20,6 +20,9 @@ typedef struct BufferContext {
     Buffer vertex_buffer {};
     Buffer index_buffer {};
 
+    std::vector<Buffer> uniform_buffers {};
+    std::vector<void*> uniform_buffers_mapped {};
+
     Image image {};
     Texture texture {};
     VkSampler sampler = nullptr;

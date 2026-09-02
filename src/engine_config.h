@@ -26,5 +26,5 @@ typedef struct EngineConfig {
     static constexpr int window_width = 1200;
     static constexpr int window_height = 900;
 
-    static constexpr int max_frames_in_flights = 2;
+    static constexpr int max_frames_in_flight = 2;
 } EngineConfig;

@@ -5,17 +5,19 @@
 #include "platform/window.h"
 // graphics
 #include "renderer/command.h"
+#include "renderer/descriptor.h"
 #include "renderer/device.h"
 #include "renderer/draw.h"
 #include "renderer/pipeline.h"
 #include "renderer/swapchain.h"
 #include "renderer/sync.h"
+#include "renderer/uniform.h"
+#include "renderer/vulkan_allocator.h"
 #include "renderer/vulkan_instance.h"
 // graphics (resources)
 #include "renderer/resources/buffer.h"
 #include "renderer/resources/sampler.h"
 #include "renderer/resources/texture.h"
-#include "renderer/resources/vulkan_allocator.h"
 // contexts (engine)
 #include "engine_config.h"
 #include "engine_state.h"
@@ -24,8 +26,6 @@
 #include "device_context.h"
 #include "rendering_context.h"
 #include "vulkan_context.h"
-// misc.
-// #include "types/vertex.h"
 
 #include <SDL3/SDL.h>
 
@@ -83,16 +83,20 @@ class Renderer {
             rendering_context.swapchain_images.size(), rendering_context.swapchain_image_views.data()
         );
 
-        pipelineCreateGraphics(
-            device_context.logical_device, rendering_context.swapchain_surface_format, &vulkan_context.graphics_pipeline, &vulkan_context.pipeline_layout
+        // pipeline
+        descriptor::CreateSetLayout(device_context.logical_device, &vulkan_context.descriptor_layout);
+
+        pipeline::CreateGraphics(
+            device_context.logical_device, rendering_context.swapchain_surface_format, vulkan_context.descriptor_layout, &vulkan_context.graphics_pipeline,
+            &vulkan_context.pipeline_layout
         );
 
-        vulkan_context.command_buffers.resize(swapchain_images_count);
         // command
+        vulkan_context.command_buffers.resize(swapchain_images_count);
         commandCreatePool(device_context.logical_device, device_context.queue_index, &vulkan_context.command_pool);
         commandAllocateBuffers(device_context.logical_device, vulkan_context.command_pool, vulkan_context.command_buffers.data());
 
-        // buffers
+        // vertex buffer
         buffer::Create(
             sizeof(buffer_context.vertices[0]) * buffer_context.vertices.size(), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
             vulkan_context.allocator, &buffer_context.vertex_buffer
@@ -102,6 +106,7 @@ class Renderer {
             sizeof(buffer_context.vertices[0]) * buffer_context.vertices.size(), buffer_context.vertices.data(), &buffer_context.vertex_buffer
         );
 
+        // index buffer
         buffer::Create(
             sizeof(buffer_context.indices[0]) * buffer_context.indices.size(), VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, 0,
             vulkan_context.allocator, &buffer_context.index_buffer
@@ -111,9 +116,20 @@ class Renderer {
             sizeof(buffer_context.indices[0]) * buffer_context.indices.size(), buffer_context.indices.data(), &buffer_context.index_buffer
         );
 
+        // uniform buffer
+        buffer_context.uniform_buffers.resize(swapchain_images_count);
+        buffer_context.uniform_buffers_mapped.resize(swapchain_images_count);
+        uniform::CreateBuffers(vulkan_context.allocator, buffer_context.uniform_buffers.data(), buffer_context.uniform_buffers_mapped.data());
+
+        vulkan_context.descriptor_sets.resize(EngineConfig::max_frames_in_flight);
+        descriptor::CreatePool(device_context.logical_device, &vulkan_context.descriptor_pool);
+        descriptor::CreateSets(
+            device_context.logical_device, vulkan_context.descriptor_layout, vulkan_context.descriptor_pool, vulkan_context.descriptor_sets.data()
+        );
+        descriptor::ConfigureSets(device_context.logical_device, buffer_context.uniform_buffers.data(), vulkan_context.descriptor_sets.data());
+
         // image
         if (!image::LoadFromFile("small.png", &buffer_context.image)) return;
-        evoLog(PrintSeverity::Debug, "Image size: {}", buffer_context.image.size);
 
         // texture
         texture::Create(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
@@ -143,7 +159,8 @@ class Renderer {
                 static_cast<uint32_t>(rendering_context.in_flight_fences.size()), rendering_context.present_complete_semaphores.data(),
                 rendering_context.render_finished_semaphores.data(), rendering_context.swapchain, device_context.graphics_queue,
                 vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(),
-                vulkan_context.graphics_pipeline, rendering_context.swapchain_extent, &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data
+                vulkan_context.graphics_pipeline, vulkan_context.pipeline_layout, vulkan_context.descriptor_sets.data(), rendering_context.swapchain_extent,
+                &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data, buffer_context.uniform_buffers_mapped.data()
             );
 
             // evoLog(PrintSeverity::Debug, "drew frame");

@@ -15,7 +15,10 @@ void drawFrame(
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
     const VkPipeline graphics_pipeline,
+    const VkPipelineLayout pipeline_layout,
+    const VkDescriptorSet* descriptor_sets,
     const VkExtent2D swapchain_extent,
     const VkBuffer* vertex_buffer,
-    const VkBuffer* index_buffer
+    const VkBuffer* index_buffer,
+    void** uniform_buffers_mapped
 );

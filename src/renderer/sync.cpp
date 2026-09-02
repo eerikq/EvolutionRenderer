@@ -18,7 +18,7 @@ void syncCreateObjects(
     render_finished_semaphores->clear();
     present_complete_semaphores->clear();
 
-    for (size_t i = 0; i < EngineConfig::max_frames_in_flights; i++) {
+    for (size_t i = 0; i < EngineConfig::max_frames_in_flight; i++) {
         VkSemaphore render_semaphore;
         vkCreateSemaphore(logical_device, &semaphore_create_info, nullptr, &render_semaphore);
         render_finished_semaphores->emplace_back(render_semaphore);
