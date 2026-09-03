@@ -73,7 +73,7 @@ VkResult vulkanCreateInstance(VkInstance* instance) {
 
     // instance extensions
     uint32_t extensions_count = 0;
-    const char* const* extension_names = windowGetInstanceExtensions(&extensions_count);
+    const char* const* extension_names = window::GetInstanceExtensions(&extensions_count);
 
     std::vector extensions(extension_names, extension_names + extensions_count);
     if (EngineConfig::enable_validation_layers) extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

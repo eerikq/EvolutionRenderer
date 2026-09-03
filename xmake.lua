@@ -10,10 +10,12 @@ set_toolchains("clang")
 add_requires("volk 1.4.335+0")
 add_requires("vulkan-headers 1.4.335+0")
 add_requires("vulkan-memory-allocator 3.3.0")
+-- add_requires("slang 2026.16")
 
 add_requires("glm 1.0.3")
 add_requires("fmt 12.2.0")
 add_requires("stb 2026.03.18")
+add_requires("assimp 6.0.5")
 
 add_requires("libsdl3 3.4.12")
 add_requires("imgui v1.92.7-docking", {
