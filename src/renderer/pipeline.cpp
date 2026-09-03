@@ -52,7 +52,7 @@ namespace pipeline {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
             .vertexBindingDescriptionCount = 1,
             .pVertexBindingDescriptions = &VertexDescription::binding_description,
-            .vertexAttributeDescriptionCount = 2,
+            .vertexAttributeDescriptionCount = 3,
             .pVertexAttributeDescriptions = VertexDescription::attribute_descriptions,
         };
 

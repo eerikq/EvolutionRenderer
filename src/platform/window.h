@@ -2,11 +2,13 @@
 
 #include <volk.h>
 
-bool windowCreate(int window_width, int window_height);
-void windowDestroy();
+namespace window {
+    bool Create();
+    void Destroy();
 
-bool windowCreateSurface(const VkInstance instance, VkSurfaceKHR* surface);
-void windowDestroySurface(const VkInstance instance, VkSurfaceKHR* surface);
+    bool CreateSurface(const VkInstance instance, VkSurfaceKHR* surface);
+    void DestroySurface(const VkInstance instance, VkSurfaceKHR* surface);
 
-const char* const* windowGetInstanceExtensions(uint32_t* count);
-bool windowGetSize(int* width, int* height);
+    const char* const* GetInstanceExtensions(uint32_t* count);
+    bool GetSizeInPixels(int* width, int* height);
+} // namespace window

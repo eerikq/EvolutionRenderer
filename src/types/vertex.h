@@ -4,6 +4,7 @@
 typedef struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
+    glm::vec2 texCoord;
 } Vertex;
 
 typedef struct VertexDescription {
@@ -20,7 +21,7 @@ typedef struct VertexDescription {
     // 4. has a lightweight
     // 5. dont suffer from pointer decay (i.e. type and array dimension isn't lost)
     // 6. can be directly handed to C APIs via .data()
-    static constexpr VkVertexInputAttributeDescription attribute_descriptions[2] = {
+    static constexpr VkVertexInputAttributeDescription attribute_descriptions[3] = {
         {
             .location = 0,
             .binding = 0,
@@ -32,6 +33,12 @@ typedef struct VertexDescription {
             .binding = 0,
             .format = VK_FORMAT_R32G32B32_SFLOAT,
             .offset = offsetof(Vertex, color),
+        },
+        {
+            .location = 2,
+            .binding = 0,
+            .format = VK_FORMAT_R32G32_SFLOAT,
+            .offset = offsetof(Vertex, texCoord),
         }
     };
 } VertexDescription;

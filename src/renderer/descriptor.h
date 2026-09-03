@@ -17,7 +17,13 @@ namespace descriptor {
         const VkDescriptorPool descriptor_pool,
         VkDescriptorSet* descriptor_set
     );
-    VkResult ConfigureSets(const VkDevice logical_device, const Buffer* uniform_buffers, const VkDescriptorSet* descriptor_sets);
+    VkResult ConfigureSets(
+        const VkDevice logical_device,
+        const Buffer* uniform_buffers,
+        const VkImageView texture_view,
+        const VkSampler texture_sampler,
+        const VkDescriptorSet* descriptor_sets
+    );
     void DestroySets(
         const VkDevice logical_device,
         const VkDescriptorPool descriptor_pool,

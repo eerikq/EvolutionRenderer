@@ -10,7 +10,7 @@ static VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR capabilities) 
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) return capabilities.currentExtent;
 
     int width, height;
-    windowGetSize(&width, &height);
+    window::GetSizeInPixels(&width, &height);
 
     return {
         std::clamp(static_cast<uint32_t>(width), capabilities.minImageExtent.width, capabilities.maxImageExtent.width),

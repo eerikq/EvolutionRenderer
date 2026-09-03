@@ -40,7 +40,7 @@ VulkanContext vulkan_context;
 class Renderer {
   public:
     void run() {
-        windowCreate(EngineConfig::window_width, EngineConfig::window_height);
+        window::Create();
         init_vulkan();
         main_loop();
         cleanup();
@@ -55,13 +55,16 @@ class Renderer {
         vulkanCreateDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
 
         // window
-        windowCreateSurface(vulkan_context.instance, &rendering_context.surface);
+        window::CreateSurface(vulkan_context.instance, &rendering_context.surface);
 
         // device
-        devicePickPhysicalDevice(vulkan_context.instance, &device_context.physical_device);
-        deviceCreateLogicalDevice(device_context.physical_device, rendering_context.surface, &device_context.queue_index, &device_context.logical_device);
+        device::PickPhysical(vulkan_context.instance, &device_context.physical_device);
+        device::CreateLogical(device_context.physical_device, rendering_context.surface, &device_context.queue_index, &device_context.logical_device);
         volkLoadDevice(device_context.logical_device);
-        deviceGetQueue(device_context.logical_device, device_context.queue_index, &device_context.graphics_queue);
+
+        device::GetLogicalQueue(device_context.logical_device, device_context.queue_index, &device_context.graphics_queue);
+        device::GetPhysicalProperties(device_context.physical_device, &device_context.device_properties);
+        device::GetPhysicalFeatures(device_context.physical_device, &device_context.device_features);
 
         // allocator
         vulkanAllocatorCreate(vulkan_context.instance, device_context.physical_device, device_context.logical_device, &vulkan_context.allocator);
@@ -116,6 +119,20 @@ class Renderer {
             sizeof(buffer_context.indices[0]) * buffer_context.indices.size(), buffer_context.indices.data(), &buffer_context.index_buffer
         );
 
+        // image
+        if (!image::LoadFromFile("industry.png", &buffer_context.image)) return;
+
+        // texture
+        texture::Create(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
+        texture::LoadImage(
+            device_context.logical_device, device_context.graphics_queue, vulkan_context.command_pool, vulkan_context.allocator, &buffer_context.image,
+            &buffer_context.texture
+        );
+        texture::CreateView(device_context.logical_device, VkFormat::VK_FORMAT_R8G8B8A8_SRGB, &buffer_context.texture);
+
+        // sampler
+        sampler::Create(device_context.logical_device, &device_context.device_properties, &buffer_context.sampler);
+
         // uniform buffer
         buffer_context.uniform_buffers.resize(swapchain_images_count);
         buffer_context.uniform_buffers_mapped.resize(swapchain_images_count);
@@ -126,20 +143,10 @@ class Renderer {
         descriptor::CreateSets(
             device_context.logical_device, vulkan_context.descriptor_layout, vulkan_context.descriptor_pool, vulkan_context.descriptor_sets.data()
         );
-        descriptor::ConfigureSets(device_context.logical_device, buffer_context.uniform_buffers.data(), vulkan_context.descriptor_sets.data());
-
-        // image
-        if (!image::LoadFromFile("small.png", &buffer_context.image)) return;
-
-        // texture
-        texture::Create(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
-        texture::LoadImage(
-            device_context.logical_device, device_context.graphics_queue, vulkan_context.command_pool, vulkan_context.allocator, &buffer_context.image,
-            &buffer_context.texture
+        descriptor::ConfigureSets(
+            device_context.logical_device, buffer_context.uniform_buffers.data(), buffer_context.texture.view, buffer_context.sampler,
+            vulkan_context.descriptor_sets.data()
         );
-
-        // sampler
-        sampler::Create(device_context.logical_device, &buffer_context.sampler);
 
         // sync
         syncCreateObjects(
@@ -176,11 +183,11 @@ class Renderer {
     }
 
     void cleanup() {
-        windowDestroySurface(vulkan_context.instance, &rendering_context.surface);
+        window::DestroySurface(vulkan_context.instance, &rendering_context.surface);
         vulkanDestroyDebugMessenger(vulkan_context.instance, &vulkan_context.debug_messenger);
         vulkanDestroyInstance(&vulkan_context.instance);
 
-        windowDestroy();
+        window::Destroy();
     }
 };
 
