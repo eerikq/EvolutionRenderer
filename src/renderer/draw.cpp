@@ -1,14 +1,14 @@
 #include "draw.h"
 
+#include "engine_config.h"
 #include "renderer/command.h"
+#include "renderer/uniform.h"
 #include "util/log.h"
 
 #include <cassert>
 
-constexpr uint32_t max_frames_in_flights = 2;
-
 void drawFrame(
-    uint32_t* frame_index,
+    int* frame_index,
     const VkDevice logical_device,
     const VkFence* in_flight_fences,
     const uint32_t in_flight_fences_count,
@@ -20,9 +20,12 @@ void drawFrame(
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
     const VkPipeline graphics_pipeline,
+    const VkPipelineLayout pipeline_layout,
+    const VkDescriptorSet* descriptor_sets,
     const VkExtent2D swapchain_extent,
     const VkBuffer* vertex_buffer,
-    const VkBuffer* index_buffer
+    const VkBuffer* index_buffer,
+    void** uniform_buffers_mapped
 ) {
     if (vkWaitForFences(logical_device, 1, &in_flight_fences[*frame_index], VK_TRUE, UINT64_MAX) != VK_SUCCESS) throw "failed to wait for fence!";
 
@@ -57,10 +60,13 @@ void drawFrame(
     }
 
     commandRecordBuffer(
-        *frame_index, image_index, command_buffers, swapchain_images, swapchain_image_views, graphics_pipeline, swapchain_extent, vertex_buffer, index_buffer
+        *frame_index, image_index, command_buffers, swapchain_images, swapchain_image_views, graphics_pipeline, pipeline_layout, descriptor_sets,
+        swapchain_extent, vertex_buffer, index_buffer
     );
 
     vkQueueWaitIdle(graphics_queue);
+
+    uniform::UpdateBuffers(*frame_index, swapchain_extent, uniform_buffers_mapped);
 
     VkPipelineStageFlags wait_destionation_stage_mask(VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT);
     const VkSubmitInfo submit_info {
@@ -91,5 +97,5 @@ void drawFrame(
         default: break; // an unexpected result is returned!
     }
 
-    *frame_index = (*frame_index + 1) % max_frames_in_flights;
+    *frame_index = (*frame_index + 1) % EngineConfig::max_frames_in_flight;
 }

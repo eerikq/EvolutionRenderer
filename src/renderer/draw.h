@@ -3,7 +3,7 @@
 #include <volk.h>
 
 void drawFrame(
-    uint32_t* frame_index,
+    int* frame_index,
     const VkDevice logical_device,
     const VkFence* in_flight_fences,
     const uint32_t in_flight_fences_count,
@@ -15,7 +15,10 @@ void drawFrame(
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
     const VkPipeline graphics_pipeline,
+    const VkPipelineLayout pipeline_layout,
+    const VkDescriptorSet* descriptor_sets,
     const VkExtent2D swapchain_extent,
     const VkBuffer* vertex_buffer,
-    const VkBuffer* index_buffer
+    const VkBuffer* index_buffer,
+    void** uniform_buffers_mapped
 );

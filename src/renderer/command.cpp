@@ -1,10 +1,10 @@
 #include "command.h"
 
+#include "engine_config.h"
 #include "types/vertex.h"
+#include "vulkan/vulkan_core.h"
 
 #include <vector>
-
-constexpr uint32_t max_frames_in_flights = 2;
 
 const std::vector<Vertex> vertices = {
     {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
@@ -35,7 +35,7 @@ VkResult commandAllocateBuffers(const VkDevice logical_device, const VkCommandPo
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
         .commandPool = command_pool,
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = max_frames_in_flights,
+        .commandBufferCount = EngineConfig::max_frames_in_flight,
     };
 
     return vkAllocateCommandBuffers(logical_device, &create_info, command_buffers);
@@ -101,6 +101,8 @@ void commandRecordBuffer(
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
     const VkPipeline graphics_pipeline,
+    const VkPipelineLayout pipeline_layout,
+    const VkDescriptorSet* descriptor_sets,
     const VkExtent2D swapchain_extent,
     const VkBuffer* vertex_buffer,
     const VkBuffer* index_buffer
@@ -150,6 +152,9 @@ void commandRecordBuffer(
     VkDeviceSize device_size = 0;
     vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffer, &device_size);
     vkCmdBindIndexBuffer(command_buffer, *index_buffer, 0, VK_INDEX_TYPE_UINT16);
+
+    vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout, 0, 1, &descriptor_sets[frame_index], 0, nullptr);
+
     vkCmdDrawIndexed(command_buffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
     vkCmdEndRendering(command_buffer);
 
