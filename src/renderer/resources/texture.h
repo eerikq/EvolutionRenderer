@@ -26,6 +26,17 @@ namespace texture {
 
     VkResult Create(
         const VkDevice logical_device,
+        const VkFormat format,
+        const VkImageUsageFlags usage,
+        const uint32_t width,
+        const uint32_t height,
+        const VmaAllocator allocator,
+        const VmaAllocationCreateFlags allocation_flags,
+        Texture* texture
+    );
+
+    VkResult CreateFromImage(
+        const VkDevice logical_device,
         const VmaAllocator allocator,
         const VmaAllocationCreateFlags allocation_flags,
         const Image* image,

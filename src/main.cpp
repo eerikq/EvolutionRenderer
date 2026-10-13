@@ -1,4 +1,5 @@
 // fundemental
+#include "renderer/depth.h"
 #include "util/image.h"
 #include "util/log.h"
 // application
@@ -25,6 +26,7 @@
 #include "buffer_context.h"
 #include "device_context.h"
 #include "rendering_context.h"
+#include "vulkan/vulkan_core.h"
 #include "vulkan_context.h"
 
 #include <SDL3/SDL.h>
@@ -76,6 +78,11 @@ void init_vulkan() {
         rendering_context.swapchain_images.size(), rendering_context.swapchain_image_views.data()
     );
 
+    // depth
+    VkFormat depth_format = depth::FindDepthFormat(device_context.physical_device);
+    texture::Create(device_context.logical_device, depth_format, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, rendering_context.swapchain_extent.width, rendering_context.swapchain_extent.height, vulkan_context.allocator, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, &buffer_context.depth);
+    texture::CreateView(device_context.logical_device, depth_format, &buffer_context.depth);
+
     // pipeline
     descriptor::CreateSetLayout(device_context.logical_device, &vulkan_context.descriptor_layout);
 
@@ -113,7 +120,7 @@ void init_vulkan() {
     if (!image::LoadFromFile("assets/industry.png", &buffer_context.image)) return;
 
     // texture
-    texture::Create(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
+    texture::CreateFromImage(device_context.logical_device, vulkan_context.allocator, 0, &buffer_context.image, &buffer_context.texture);
     texture::LoadImage(
         device_context.logical_device, device_context.graphics_queue, vulkan_context.command_pool, vulkan_context.allocator, &buffer_context.image,
         &buffer_context.texture

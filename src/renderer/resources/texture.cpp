@@ -45,6 +45,38 @@ namespace texture {
 
     VkResult Create(
         const VkDevice logical_device,
+        const VkFormat format,
+        const VkImageUsageFlags usage,
+        const uint32_t width,
+        const uint32_t height,
+        const VmaAllocator allocator,
+        const VmaAllocationCreateFlags allocation_flags,
+        Texture* texture
+    ) {
+        VkImageCreateInfo create_info {
+            .sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .imageType = VkImageType::VK_IMAGE_TYPE_2D,
+            .format = format,
+            .extent = { width, height, 1 },
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = usage,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        };
+
+        VmaAllocationCreateInfo allocation_info {
+            .flags = allocation_flags,
+            .usage = VMA_MEMORY_USAGE_AUTO,
+        };
+
+        return vmaCreateImage(allocator, &create_info, &allocation_info, &texture->data, &texture->allocation, nullptr);
+    }
+
+    VkResult CreateFromImage(
+        const VkDevice logical_device,
         const VmaAllocator allocator,
         const VmaAllocationCreateFlags allocation_flags,
         const Image* image,

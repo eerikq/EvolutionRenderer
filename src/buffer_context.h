@@ -33,5 +33,6 @@ typedef struct BufferContext {
 
     Image image {};
     Texture texture {};
+    Texture depth {};
     VkSampler sampler = nullptr;
 } BufferContext;

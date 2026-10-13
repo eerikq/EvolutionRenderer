@@ -4,7 +4,7 @@ add_rules("plugin.compile_commands.autoupdate")
 
 -- toolchain
 set_languages("c++20")
-set_toolchains("clang")
+set_toolchains("msvc")
 
 -- libraries
 add_requires("volk 1.4.335+0")
@@ -12,7 +12,10 @@ add_requires("vulkan-headers 1.4.335+0")
 add_requires("vulkan-memory-allocator 3.3.0")
 -- add_requires("slang 2026.16") -- don't think i need this?
 
-add_requires("tinyobjloader")
+add_requires("tinyobjloader", {
+    system = false,
+    configs = { cxxflags = "-std=c++20" }
+})
 -- add_requires("cgltf 1.15") -- implement after obj importing works
 -- add_requires("assimp 6.0.5") -- assimp seems cool but i think cgltf does things in a way i like more
 
