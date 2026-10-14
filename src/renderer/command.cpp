@@ -2,6 +2,7 @@
 
 #include "engine_config.h"
 #include "types/vertex.h"
+#include "vulkan/vulkan_core.h"
 
 #include <vector>
 
@@ -95,6 +96,7 @@ void commandRecordBuffer(
     const VkCommandBuffer* command_buffers,
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
+    const VkImageView* depth_image_view,
     const VkPipeline graphics_pipeline,
     const VkPipelineLayout pipeline_layout,
     const VkDescriptorSet* descriptor_sets,
@@ -109,19 +111,35 @@ void commandRecordBuffer(
     };
     vkBeginCommandBuffer(command_buffer, &begin_info);
 
+    //
+    // https://docs.vulkan.org/tutorial/latest/07_Depth_buffering.html#_explicitly_transitioning_the_depth_image
+    //
+
     transition_image_layout(
         command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, {},
         VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
     );
 
-    VkClearValue clear_color = {0.0f, 0.0f, 0.0f, 1.0f};
-    VkRenderingAttachmentInfo attachment_info {
+    VkClearValue clear_value {};
+    clear_value.color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clear_value.depthStencil = {1.0f, 0};
+
+    VkRenderingAttachmentInfo color_attachment_info {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = swapchain_image_views[image_index],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = clear_color
+        .clearValue = clear_value
+    };
+
+    VkRenderingAttachmentInfo depth_attachment_info {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = *depth_image_view,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .clearValue = clear_value
     };
 
     VkRenderingInfo rendering_info {
@@ -133,11 +151,23 @@ void commandRecordBuffer(
             },
         .layerCount = 1,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &attachment_info,
+        .pColorAttachments = &color_attachment_info,
+        .pDepthAttachment = &depth_attachment_info,
     };
 
     vkCmdBeginRendering(command_buffer, &rendering_info);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+
+    transition_image_layout(
+        command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT
+    );
+
+    transition_image_layout(
+        command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT
+    );
+
 
     VkViewport viewport = VkViewport(0.0f, 0.0f, static_cast<float>(swapchain_extent.width), static_cast<float>(swapchain_extent.height), 0.0f, 1.0f);
     VkRect2D offset = VkRect2D(VkOffset2D(0, 0), swapchain_extent);

@@ -42,7 +42,7 @@ namespace texture {
         const Image* image,
         Texture* texture
     );
-    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, Texture* texture);
+    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, const VkImageAspectFlags aspect_flags, Texture* texture);
     void Destroy(const VmaAllocator allocator, const VkDevice logical_device, Texture* texture);
 
     VkResult LoadImage(

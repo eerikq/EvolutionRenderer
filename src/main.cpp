@@ -80,8 +80,8 @@ void init_vulkan() {
 
     // depth
     VkFormat depth_format = depth::FindDepthFormat(device_context.physical_device);
-    texture::Create(device_context.logical_device, depth_format, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT, rendering_context.swapchain_extent.width, rendering_context.swapchain_extent.height, vulkan_context.allocator, VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT, &buffer_context.depth);
-    texture::CreateView(device_context.logical_device, depth_format, &buffer_context.depth);
+    texture::Create(device_context.logical_device, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, rendering_context.swapchain_extent.width, rendering_context.swapchain_extent.height, vulkan_context.allocator, 0, &buffer_context.depth);
+    texture::CreateView(device_context.logical_device, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT, &buffer_context.depth);
 
     // pipeline
     descriptor::CreateSetLayout(device_context.logical_device, &vulkan_context.descriptor_layout);
@@ -125,7 +125,7 @@ void init_vulkan() {
         device_context.logical_device, device_context.graphics_queue, vulkan_context.command_pool, vulkan_context.allocator, &buffer_context.image,
         &buffer_context.texture
     );
-    texture::CreateView(device_context.logical_device, VkFormat::VK_FORMAT_R8G8B8A8_SRGB, &buffer_context.texture);
+    texture::CreateView(device_context.logical_device, VkFormat::VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT, &buffer_context.texture);
 
     // sampler
     sampler::Create(device_context.logical_device, &device_context.device_properties, &buffer_context.sampler);
@@ -162,7 +162,7 @@ void main_loop() {
             &engine_state.frame_index, device_context.logical_device, rendering_context.in_flight_fences.data(),
             static_cast<uint32_t>(rendering_context.in_flight_fences.size()), rendering_context.present_complete_semaphores.data(),
             rendering_context.render_finished_semaphores.data(), rendering_context.swapchain, device_context.graphics_queue,
-            vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(),
+            vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(), &buffer_context.depth.view,
             vulkan_context.graphics_pipeline, vulkan_context.pipeline_layout, vulkan_context.descriptor_sets.data(), rendering_context.swapchain_extent,
             &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data, buffer_context.uniform_buffers_mapped.data()
         );
