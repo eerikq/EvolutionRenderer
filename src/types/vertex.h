@@ -2,7 +2,7 @@
 #include <volk.h>
 
 typedef struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 texCoord;
 } Vertex;
@@ -25,7 +25,7 @@ typedef struct VertexDescription {
         {
             .location = 0,
             .binding = 0,
-            .format = VK_FORMAT_R32G32_SFLOAT,
+            .format = VK_FORMAT_R32G32B32_SFLOAT,
             .offset = offsetof(Vertex, pos),
         },
         {

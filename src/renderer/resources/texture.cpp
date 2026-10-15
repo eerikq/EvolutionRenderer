@@ -16,10 +16,10 @@ namespace texture {
     ) {
         VkImageMemoryBarrier2 barrier {
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
-            .srcStageMask = src_stage_mask,
-            .srcAccessMask = src_access_mask,
-            .dstStageMask = dst_stage_mask,
-            .dstAccessMask = dst_access_mask,
+            // .srcStageMask = src_stage_mask,
+            // .srcAccessMask = src_access_mask,
+            // .dstStageMask = dst_stage_mask,
+            // .dstAccessMask = dst_access_mask,
             .oldLayout = old_layout,
             .newLayout = new_layout,
             .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -33,6 +33,26 @@ namespace texture {
                 .layerCount = 1,
             }
         };
+
+        VkPipelineStageFlags source_stage;
+        VkPipelineStageFlags destination_stage;
+
+        if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+            source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+            source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        } else {
+            throw std::invalid_argument("unsupported layout transition!");
+        }
+
         VkDependencyInfo dependency_info = {
             .sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO,
             .dependencyFlags = 0,
@@ -44,6 +64,38 @@ namespace texture {
     }
 
     VkResult Create(
+        const VkDevice logical_device,
+        const VkFormat format,
+        const VkImageUsageFlags usage,
+        const uint32_t width,
+        const uint32_t height,
+        const VmaAllocator allocator,
+        const VmaAllocationCreateFlags allocation_flags,
+        Texture* texture
+    ) {
+        VkImageCreateInfo create_info {
+            .sType = VkStructureType::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
+            .imageType = VkImageType::VK_IMAGE_TYPE_2D,
+            .format = format,
+            .extent = { width, height, 1 },
+            .mipLevels = 1,
+            .arrayLayers = 1,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = usage,
+            .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+        };
+
+        VmaAllocationCreateInfo allocation_info {
+            .flags = allocation_flags,
+            .usage = VMA_MEMORY_USAGE_AUTO,
+        };
+
+        return vmaCreateImage(allocator, &create_info, &allocation_info, &texture->data, &texture->allocation, nullptr);
+    }
+
+    VkResult CreateFromImage(
         const VkDevice logical_device,
         const VmaAllocator allocator,
         const VmaAllocationCreateFlags allocation_flags,
@@ -85,7 +137,7 @@ namespace texture {
         return vmaCreateImage(allocator, &create_info, &allocation_info, &texture->data, &texture->allocation, nullptr);
     }
 
-    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, Texture* texture) {
+    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, const VkImageAspectFlags aspect_flags, Texture* texture) {
         VkImageViewCreateInfo view_create_info {
             .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
             .image = texture->data,
@@ -99,7 +151,7 @@ namespace texture {
                     .a = VK_COMPONENT_SWIZZLE_IDENTITY,
                 },
             .subresourceRange = {
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .aspectMask = aspect_flags,
                 .baseMipLevel = 0,
                 .levelCount = 1,
                 .baseArrayLayer = 0,

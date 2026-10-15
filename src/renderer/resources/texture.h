@@ -26,12 +26,23 @@ namespace texture {
 
     VkResult Create(
         const VkDevice logical_device,
+        const VkFormat format,
+        const VkImageUsageFlags usage,
+        const uint32_t width,
+        const uint32_t height,
+        const VmaAllocator allocator,
+        const VmaAllocationCreateFlags allocation_flags,
+        Texture* texture
+    );
+
+    VkResult CreateFromImage(
+        const VkDevice logical_device,
         const VmaAllocator allocator,
         const VmaAllocationCreateFlags allocation_flags,
         const Image* image,
         Texture* texture
     );
-    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, Texture* texture);
+    VkResult CreateView(const VkDevice logical_device, const VkFormat texture_format, const VkImageAspectFlags aspect_flags, Texture* texture);
     void Destroy(const VmaAllocator allocator, const VkDevice logical_device, Texture* texture);
 
     VkResult LoadImage(

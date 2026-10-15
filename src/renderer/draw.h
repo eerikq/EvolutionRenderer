@@ -14,6 +14,8 @@ void drawFrame(
     const VkCommandBuffer* command_buffers,
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
+    const VkImage* depth_image,
+    const VkImageView* depth_image_view,
     const VkPipeline graphics_pipeline,
     const VkPipelineLayout pipeline_layout,
     const VkDescriptorSet* descriptor_sets,

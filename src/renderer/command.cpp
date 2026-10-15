@@ -6,14 +6,7 @@
 
 #include <vector>
 
-const std::vector<Vertex> vertices = {
-    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}},
-};
-
-const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
+const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0, 4, 5, 6, 6, 7, 4};
 
 VkResult commandCreatePool(const VkDevice logical_device, const uint32_t queue_index, VkCommandPool* command_pool) {
     VkCommandPoolCreateInfo create_info {
@@ -63,7 +56,8 @@ static void transition_image_layout(
     VkAccessFlags2 src_access_mask,
     VkAccessFlags2 dst_access_mask,
     VkPipelineStageFlags2 src_stage_mask,
-    VkPipelineStageFlags2 dst_stage_mask
+    VkPipelineStageFlags2 dst_stage_mask,
+    VkImageAspectFlags aspect_flags
 ) {
     VkImageMemoryBarrier2 barrier {
         .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2,
@@ -77,7 +71,7 @@ static void transition_image_layout(
         .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
         .image = swapchain_images[image_index],
         .subresourceRange = {
-            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .aspectMask = aspect_flags,
             .baseMipLevel = 0,
             .levelCount = 1,
             .baseArrayLayer = 0,
@@ -100,6 +94,8 @@ void commandRecordBuffer(
     const VkCommandBuffer* command_buffers,
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
+    const VkImage* depth_image,
+    const VkImageView* depth_image_view,
     const VkPipeline graphics_pipeline,
     const VkPipelineLayout pipeline_layout,
     const VkDescriptorSet* descriptor_sets,
@@ -116,17 +112,36 @@ void commandRecordBuffer(
 
     transition_image_layout(
         command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, {},
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
     );
 
-    VkClearValue clear_color = {0.0f, 0.0f, 0.0f, 1.0f};
-    VkRenderingAttachmentInfo attachment_info {
+    transition_image_layout(
+        command_buffers, depth_image, frame_index, 0, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT, VK_IMAGE_ASPECT_DEPTH_BIT
+    );
+
+    VkClearValue color_clear_value {0.0f, 0.0f, 0.0f, 0.0f};
+    VkClearValue depth_clear_value {1.0f, 0};
+
+    VkRenderingAttachmentInfo color_attachment_info {
         .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
         .imageView = swapchain_image_views[image_index],
         .imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
         .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
         .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-        .clearValue = clear_color
+        .clearValue = color_clear_value
+    };
+
+    VkRenderingAttachmentInfo depth_attachment_info {
+        .sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO,
+        .imageView = *depth_image_view,
+        .imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+        .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+        .storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+        .clearValue = depth_clear_value
     };
 
     VkRenderingInfo rendering_info {
@@ -138,11 +153,24 @@ void commandRecordBuffer(
             },
         .layerCount = 1,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &attachment_info,
+        .pColorAttachments = &color_attachment_info,
+        .pDepthAttachment = &depth_attachment_info,
     };
 
     vkCmdBeginRendering(command_buffer, &rendering_info);
     vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphics_pipeline);
+
+    transition_image_layout(
+        command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
+    );
+
+    transition_image_layout(
+        command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
+    );
 
     VkViewport viewport = VkViewport(0.0f, 0.0f, static_cast<float>(swapchain_extent.width), static_cast<float>(swapchain_extent.height), 0.0f, 1.0f);
     VkRect2D offset = VkRect2D(VkOffset2D(0, 0), swapchain_extent);
@@ -160,7 +188,8 @@ void commandRecordBuffer(
 
     transition_image_layout(
         command_buffers, swapchain_images, frame_index, image_index, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT
+        VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT, {}, VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT,
+        VK_IMAGE_ASPECT_COLOR_BIT
     );
 
     vkEndCommandBuffer(command_buffer);

@@ -6,6 +6,7 @@ namespace pipeline {
     VkResult CreateGraphics(
         const VkDevice logical_device,
         const VkSurfaceFormatKHR swapchain_surface_format,
+        const VkFormat depth_format,
         const VkDescriptorSetLayout descriptor_set_layout,
         VkPipeline* graphics_pipeline,
         VkPipelineLayout* pipeline_layout
