@@ -80,15 +80,18 @@ void init_vulkan() {
 
     // depth
     VkFormat depth_format = depth::FindDepthFormat(device_context.physical_device);
-    texture::Create(device_context.logical_device, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, rendering_context.swapchain_extent.width, rendering_context.swapchain_extent.height, vulkan_context.allocator, 0, &buffer_context.depth);
+    texture::Create(
+        device_context.logical_device, depth_format, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, rendering_context.swapchain_extent.width,
+        rendering_context.swapchain_extent.height, vulkan_context.allocator, 0, &buffer_context.depth
+    );
     texture::CreateView(device_context.logical_device, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT, &buffer_context.depth);
 
     // pipeline
     descriptor::CreateSetLayout(device_context.logical_device, &vulkan_context.descriptor_layout);
 
     pipeline::CreateGraphics(
-        device_context.logical_device, rendering_context.swapchain_surface_format, vulkan_context.descriptor_layout, &vulkan_context.graphics_pipeline,
-        &vulkan_context.pipeline_layout
+        device_context.logical_device, rendering_context.swapchain_surface_format, depth_format, vulkan_context.descriptor_layout,
+        &vulkan_context.graphics_pipeline, &vulkan_context.pipeline_layout
     );
 
     // command
@@ -162,9 +165,10 @@ void main_loop() {
             &engine_state.frame_index, device_context.logical_device, rendering_context.in_flight_fences.data(),
             static_cast<uint32_t>(rendering_context.in_flight_fences.size()), rendering_context.present_complete_semaphores.data(),
             rendering_context.render_finished_semaphores.data(), rendering_context.swapchain, device_context.graphics_queue,
-            vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(), &buffer_context.depth.view,
-            vulkan_context.graphics_pipeline, vulkan_context.pipeline_layout, vulkan_context.descriptor_sets.data(), rendering_context.swapchain_extent,
-            &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data, buffer_context.uniform_buffers_mapped.data()
+            vulkan_context.command_buffers.data(), rendering_context.swapchain_images.data(), rendering_context.swapchain_image_views.data(),
+            &buffer_context.depth.data, &buffer_context.depth.view, vulkan_context.graphics_pipeline, vulkan_context.pipeline_layout,
+            vulkan_context.descriptor_sets.data(), rendering_context.swapchain_extent, &buffer_context.vertex_buffer.data, &buffer_context.index_buffer.data,
+            buffer_context.uniform_buffers_mapped.data()
         );
 
         // evoLog(PrintSeverity::Debug, "drew frame");

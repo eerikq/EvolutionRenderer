@@ -23,6 +23,7 @@ namespace pipeline {
     VkResult CreateGraphics(
         const VkDevice logical_device,
         const VkSurfaceFormatKHR swapchain_surface_format,
+        const VkFormat depth_format,
         const VkDescriptorSetLayout descriptor_set_layout,
         VkPipeline* graphics_pipeline,
         VkPipelineLayout* pipeline_layout
@@ -114,10 +115,19 @@ namespace pipeline {
 
         vkCreatePipelineLayout(logical_device, &pipeline_layout_create_info, nullptr, pipeline_layout);
 
+        VkPipelineDepthStencilStateCreateInfo depth_stencil {
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+            .depthTestEnable = VK_TRUE,
+            .depthWriteEnable = VK_TRUE,
+            .depthCompareOp = VK_COMPARE_OP_LESS,
+            .depthBoundsTestEnable = VK_FALSE,
+            .stencilTestEnable = VK_FALSE
+        };
         VkPipelineRenderingCreateInfo rendering_create_info {
             .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO,
             .colorAttachmentCount = 1,
             .pColorAttachmentFormats = &swapchain_surface_format.format,
+            .depthAttachmentFormat = depth_format
         };
         VkGraphicsPipelineCreateInfo pipeline_create_info {
             .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
@@ -129,6 +139,7 @@ namespace pipeline {
             .pViewportState = &viewport_state,
             .pRasterizationState = &rasterizer_state,
             .pMultisampleState = &multisampling_state,
+            .pDepthStencilState = &depth_stencil,
             .pColorBlendState = &color_blend_state,
             .pDynamicState = &dynamic_state,
             .layout = *pipeline_layout,

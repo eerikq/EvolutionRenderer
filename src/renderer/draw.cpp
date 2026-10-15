@@ -19,6 +19,7 @@ void drawFrame(
     const VkCommandBuffer* command_buffers,
     const VkImage* swapchain_images,
     const VkImageView* swapchain_image_views,
+    const VkImage* depth_image,
     const VkImageView* depth_image_view,
     const VkPipeline graphics_pipeline,
     const VkPipelineLayout pipeline_layout,
@@ -61,8 +62,8 @@ void drawFrame(
     }
 
     commandRecordBuffer(
-        *frame_index, image_index, command_buffers, swapchain_images, swapchain_image_views, depth_image_view, graphics_pipeline, pipeline_layout, descriptor_sets,
-        swapchain_extent, vertex_buffer, index_buffer
+        *frame_index, image_index, command_buffers, swapchain_images, swapchain_image_views, depth_image, depth_image_view, graphics_pipeline, pipeline_layout,
+        descriptor_sets, swapchain_extent, vertex_buffer, index_buffer
     );
 
     vkQueueWaitIdle(graphics_queue);
